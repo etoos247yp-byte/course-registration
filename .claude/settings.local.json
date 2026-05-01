@@ -11,7 +11,14 @@
       "Bash(cp /tmp/nextscaffold/course-registration/package.json /tmp/nextscaffold/course-registration/next.config.ts /tmp/nextscaffold/course-registration/next-env.d.ts /tmp/nextscaffold/course-registration/postcss.config.mjs /tmp/nextscaffold/course-registration/tsconfig.json /tmp/nextscaffold/course-registration/AGENTS.md /tmp/nextscaffold/course-registration/pnpm-workspace.yaml /c/Code/Course_registration/)",
       "Bash(pnpm install *)",
       "Bash(pnpm build *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(pnpm add *)",
+      "Bash(pnpm exec *)",
+      "Bash(pnpm lint *)",
+      "Bash(pnpm test *)",
+      "Bash(git -C C:/Code/Course_registration add .)",
+      "Bash(git -C C:/Code/Course_registration commit -m \"feat: composite primitives \\(Modal, Drawer, ActionCard, Meta, EmptyState, Toast\\)\")"
     ]
   }
 }
