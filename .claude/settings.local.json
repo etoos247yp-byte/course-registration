@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --version)",
+      "Bash(git init *)",
+      "Bash(pnpm create *)",
+      "Bash(mkdir -p /tmp/nextscaffold)",
+      "Read(//tmp/**)",
+      "Bash(cp -r /tmp/nextscaffold/course-registration/app /c/Code/Course_registration/)",
+      "Bash(cp -r /tmp/nextscaffold/course-registration/public /c/Code/Course_registration/)",
+      "Bash(cp /tmp/nextscaffold/course-registration/package.json /tmp/nextscaffold/course-registration/next.config.ts /tmp/nextscaffold/course-registration/next-env.d.ts /tmp/nextscaffold/course-registration/postcss.config.mjs /tmp/nextscaffold/course-registration/tsconfig.json /tmp/nextscaffold/course-registration/AGENTS.md /tmp/nextscaffold/course-registration/pnpm-workspace.yaml /c/Code/Course_registration/)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm build *)",
+      "Bash(git add *)"
+    ]
+  }
+}
