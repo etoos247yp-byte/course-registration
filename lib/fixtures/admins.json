@@ -1,0 +1,5 @@
+[
+  { "id": "adm-1", "email": "super@etoos247.kr", "name": "최영희", "role": "super_admin", "passwordHash": "super1234" },
+  { "id": "adm-2", "email": "admin1@etoos247.kr", "name": "박재형", "role": "admin", "passwordHash": "admin1234" },
+  { "id": "adm-3", "email": "admin2@etoos247.kr", "name": "이서연", "role": "admin", "passwordHash": "admin1234" }
+]

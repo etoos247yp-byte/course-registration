@@ -4,7 +4,7 @@ import { ToastProvider } from '@/components/ui/Toast';
 
 export const metadata: Metadata = {
   title: 'ETOOS 247 이천기숙학원 수강신청',
-  description: '재수정규 6평 완성반 수강신청 페이지',
+  description: '학생과 관리자가 함께 검토하는 수강신청 프로토타입',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -16,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css"
         />
       </head>
-      <body className="bg-white text-brand-text font-sans antialiased">
+      <body className="bg-white font-sans text-brand-text antialiased">
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
