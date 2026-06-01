@@ -1,5 +1,5 @@
 [
-  { "id": "adm-1", "email": "super@etoos247.kr", "name": "최영희", "role": "super_admin", "passwordHash": "super1234" },
-  { "id": "adm-2", "email": "admin1@etoos247.kr", "name": "박재형", "role": "admin", "passwordHash": "admin1234" },
-  { "id": "adm-3", "email": "admin2@etoos247.kr", "name": "이서연", "role": "admin", "passwordHash": "admin1234" }
+  { "id": "adm-1", "email": "super@etoos247.kr", "name": "최영희", "role": "super_admin", "passwordHash": "$2a$10$E2Vb4dYk9d39zO5tN7u4Ge7Q3u5R5D3Jq7zZ1.u8M1U4q8h6vH6.G" },
+  { "id": "adm-2", "email": "admin1@etoos247.kr", "name": "박재형", "role": "admin", "passwordHash": "$2a$10$Z3l5v9uO5z8g4K1o7J5wGu5H2e3K7sP5q2xV1.u8M1U4q8h6vH6.G" },
+  { "id": "adm-3", "email": "admin2@etoos247.kr", "name": "이서연", "role": "admin", "passwordHash": "$2a$10$Z3l5v9uO5z8g4K1o7J5wGu5H2e3K7sP5q2xV1.u8M1U4q8h6vH6.G" }
 ]
