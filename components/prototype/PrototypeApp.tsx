@@ -957,18 +957,18 @@ function LoginScreen({ onLogin }: { onLogin: (session: PrototypeSession) => void
   }
 
   return (
-    <main className="min-h-screen bg-brand-bg">
-      <div className="mx-auto grid min-h-screen max-w-6xl items-center gap-10 px-5 py-10 lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="text-left">
+    <main className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-5">
+      <div className="w-full max-w-md space-y-6">
+        <section className="text-center flex flex-col items-center justify-center">
           <div className="inline-flex items-center rounded-full border border-brand-border bg-white px-3 py-1 text-xs font-medium text-brand-dark">
             ETOOS 247 이천기숙학원
           </div>
-          <h1 className="mt-5 max-w-2xl text-4xl font-semibold leading-tight text-brand-text sm:text-5xl">
+          <h1 className="mt-4 text-3xl font-bold tracking-tight text-brand-text sm:text-4xl">
             이천기숙학원 수강신청
           </h1>
         </section>
 
-        <section className="rounded-lg border border-brand-border bg-white p-6 text-left">
+        <section className="rounded-lg border border-brand-border bg-white p-6 text-left shadow-sm">
           <div className="flex items-center gap-3">
             <ShieldCheck className="h-6 w-6 text-brand" />
             <div>
