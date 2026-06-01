@@ -966,9 +966,6 @@ function LoginScreen({ onLogin }: { onLogin: (session: PrototypeSession) => void
           <h1 className="mt-5 max-w-2xl text-4xl font-semibold leading-tight text-brand-text sm:text-5xl">
             이천기숙학원 수강신청
           </h1>
-          <p className="mt-4 max-w-xl text-base leading-7 text-brand-text-muted font-normal">
-            본인의 선택에 맞춰 강좌를 탐색하고, 개인 시간표 설계 및 최종 수강 지정을 처리하는 공식 시스템입니다.
-          </p>
         </section>
 
         <section className="rounded-lg border border-brand-border bg-white p-6 text-left">
