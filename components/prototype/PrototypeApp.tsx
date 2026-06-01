@@ -383,7 +383,7 @@ export function PrototypeApp({ view }: { view: View }) {
         <section className="mx-auto flex max-w-xl flex-col items-center px-6 py-24 text-center">
           <ShieldCheck className="h-12 w-12 text-brand" />
           <h1 className="mt-6 text-2xl font-semibold">로그인이 필요합니다</h1>
-          <p className="mt-2 text-sm text-brand-text-muted">학생 또는 관리자 데모 계정으로 먼저 로그인하세요.</p>
+          <p className="mt-2 text-sm text-brand-text-muted">본인 계정으로 먼저 로그인한 후에 이용하실 수 있습니다.</p>
           <Link href="/login" className="mt-6 rounded-md bg-brand px-5 py-3 text-sm font-semibold text-white">
             로그인으로 이동
           </Link>
@@ -964,10 +964,10 @@ function LoginScreen({ onLogin }: { onLogin: (session: PrototypeSession) => void
             ETOOS 247 이천기숙학원
           </div>
           <h1 className="mt-5 max-w-2xl text-4xl font-semibold leading-tight text-brand-text sm:text-5xl">
-            이천기숙학원 공식 수강신청 시스템
+            이천기숙학원 수강신청
           </h1>
-          <p className="mt-4 max-w-xl text-base leading-7 text-brand-text-muted">
-            학생은 본인의 선택에 맞춰 강좌 탐색, 개인 시간표 설계, 수강 확정을 진행하고, 관리자는 소속 학생의 일괄 정보 관리 및 변경 승인을 처리합니다.
+          <p className="mt-4 max-w-xl text-base leading-7 text-brand-text-muted font-normal">
+            본인의 선택에 맞춰 강좌를 탐색하고, 개인 시간표 설계 및 최종 수강 지정을 처리하는 공식 시스템입니다.
           </p>
         </section>
 
@@ -1002,29 +1002,6 @@ function LoginScreen({ onLogin }: { onLogin: (session: PrototypeSession) => void
             {error ? <p className="text-sm text-brand-danger">{error}</p> : null}
             <button className="w-full rounded-md bg-brand px-4 py-3 text-sm font-semibold text-white">시작하기</button>
           </form>
-          {!isSupabaseConfigured && (
-            <div className="mt-5 grid gap-2 text-sm border-t border-brand-border pt-4">
-              <p className="text-xs text-brand-text-muted mb-1 font-semibold">데모 로컬 계정으로 로그인 (개발 테스트용)</p>
-              <button
-                onClick={() => {
-                  setIdentifier('김민준');
-                  setSecret('070318');
-                }}
-                className="rounded-md border border-brand-border px-3 py-2 text-left hover:bg-brand-bg text-brand-text"
-              >
-                학생: 김민준 / 070318
-              </button>
-              <button
-                onClick={() => {
-                  setIdentifier('admin@etoos247.kr');
-                  setSecret('admin1234');
-                }}
-                className="rounded-md border border-brand-border px-3 py-2 text-left hover:bg-brand-bg text-brand-text"
-              >
-                관리자: admin@etoos247.kr / admin1234
-              </button>
-            </div>
-          )}
         </section>
       </div>
     </main>
