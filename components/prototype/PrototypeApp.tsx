@@ -933,8 +933,8 @@ export function PrototypeApp({ view }: { view: View }) {
 
 function LoginScreen({ onLogin }: { onLogin: (session: PrototypeSession) => void }) {
   const router = useRouter();
-  const [identifier, setIdentifier] = React.useState('김민준');
-  const [secret, setSecret] = React.useState('070318');
+  const [identifier, setIdentifier] = React.useState('');
+  const [secret, setSecret] = React.useState('');
   const [error, setError] = React.useState('');
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -959,29 +959,24 @@ function LoginScreen({ onLogin }: { onLogin: (session: PrototypeSession) => void
   return (
     <main className="min-h-screen bg-brand-bg">
       <div className="mx-auto grid min-h-screen max-w-6xl items-center gap-10 px-5 py-10 lg:grid-cols-[1.1fr_0.9fr]">
-        <section>
+        <section className="text-left">
           <div className="inline-flex items-center rounded-full border border-brand-border bg-white px-3 py-1 text-xs font-medium text-brand-dark">
             ETOOS 247 이천기숙학원
           </div>
           <h1 className="mt-5 max-w-2xl text-4xl font-semibold leading-tight text-brand-text sm:text-5xl">
-            수강신청을 바로 점검할 수 있는 운영 프로토타입
+            이천기숙학원 공식 수강신청 시스템
           </h1>
           <p className="mt-4 max-w-xl text-base leading-7 text-brand-text-muted">
-            학생은 강좌 탐색, 시간표 확인, 장바구니 확정을 진행하고 관리자는 학생, 강좌, 신청 현황을 한 화면에서 확인합니다.
+            학생은 본인의 선택에 맞춰 강좌 탐색, 개인 시간표 설계, 수강 확정을 진행하고, 관리자는 소속 학생의 일괄 정보 관리 및 변경 승인을 처리합니다.
           </p>
-          <div className="mt-8 grid max-w-2xl gap-3 sm:grid-cols-3">
-            <Metric label="학생 데모" value="4명" />
-            <Metric label="개설 강좌" value="6개" />
-            <Metric label="상태" value="Mock" />
-          </div>
         </section>
 
-        <section className="rounded-lg border border-brand-border bg-white p-6">
+        <section className="rounded-lg border border-brand-border bg-white p-6 text-left">
           <div className="flex items-center gap-3">
             <ShieldCheck className="h-6 w-6 text-brand" />
             <div>
               <h2 className="font-semibold">로그인</h2>
-              <p className="text-sm text-brand-text-muted">데모 계정이 미리 입력되어 있습니다.</p>
+              <p className="text-sm text-brand-text-muted">수강신청 시스템 로그인 정보를 입력하세요.</p>
             </div>
           </div>
           <form onSubmit={submit} className="mt-6 space-y-4">
@@ -990,7 +985,8 @@ function LoginScreen({ onLogin }: { onLogin: (session: PrototypeSession) => void
               <input
                 value={identifier}
                 onChange={(event) => setIdentifier(event.target.value)}
-                className="mt-2 w-full rounded-md border border-brand-border px-3 py-3 outline-none focus:border-brand"
+                placeholder="이름 또는 이메일을 입력하세요"
+                className="mt-2 w-full rounded-md border border-brand-border px-3 py-3 outline-none focus:border-brand text-brand-text"
               />
             </label>
             <label className="block">
@@ -999,32 +995,36 @@ function LoginScreen({ onLogin }: { onLogin: (session: PrototypeSession) => void
                 value={secret}
                 onChange={(event) => setSecret(event.target.value)}
                 type={identifier.includes('@') ? 'password' : 'text'}
-                className="mt-2 w-full rounded-md border border-brand-border px-3 py-3 outline-none focus:border-brand"
+                placeholder="생년월일 6자리(YYMMDD) 또는 비밀번호"
+                className="mt-2 w-full rounded-md border border-brand-border px-3 py-3 outline-none focus:border-brand text-brand-text"
               />
             </label>
             {error ? <p className="text-sm text-brand-danger">{error}</p> : null}
             <button className="w-full rounded-md bg-brand px-4 py-3 text-sm font-semibold text-white">시작하기</button>
           </form>
-          <div className="mt-5 grid gap-2 text-sm">
-            <button
-              onClick={() => {
-                setIdentifier('김민준');
-                setSecret('070318');
-              }}
-              className="rounded-md border border-brand-border px-3 py-2 text-left hover:bg-brand-bg"
-            >
-              학생: 김민준 / 070318
-            </button>
-            <button
-              onClick={() => {
-                setIdentifier('admin@etoos247.kr');
-                setSecret('admin1234');
-              }}
-              className="rounded-md border border-brand-border px-3 py-2 text-left hover:bg-brand-bg"
-            >
-              관리자: admin@etoos247.kr / admin1234
-            </button>
-          </div>
+          {!isSupabaseConfigured && (
+            <div className="mt-5 grid gap-2 text-sm border-t border-brand-border pt-4">
+              <p className="text-xs text-brand-text-muted mb-1 font-semibold">데모 로컬 계정으로 로그인 (개발 테스트용)</p>
+              <button
+                onClick={() => {
+                  setIdentifier('김민준');
+                  setSecret('070318');
+                }}
+                className="rounded-md border border-brand-border px-3 py-2 text-left hover:bg-brand-bg text-brand-text"
+              >
+                학생: 김민준 / 070318
+              </button>
+              <button
+                onClick={() => {
+                  setIdentifier('admin@etoos247.kr');
+                  setSecret('admin1234');
+                }}
+                className="rounded-md border border-brand-border px-3 py-2 text-left hover:bg-brand-bg text-brand-text"
+              >
+                관리자: admin@etoos247.kr / admin1234
+              </button>
+            </div>
+          )}
         </section>
       </div>
     </main>
@@ -2000,17 +2000,21 @@ function AdminConsole({
                   >
                     정정기간 즉시 닫기
                   </button>
-                  <hr className={darkMode ? 'border-zinc-800' : 'border-brand-border-light'} />
-                  <button
-                    onClick={onReset}
-                    className={`w-full rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
-                      darkMode
-                        ? 'border-brand-danger bg-red-950/20 text-brand-danger hover:bg-red-950/40'
-                        : 'border-brand-danger-bg bg-white text-brand-danger hover:bg-brand-danger-bg'
-                    }`}
-                  >
-                    데모 데이터 초기화
-                  </button>
+                  {!isSupabaseConfigured && (
+                    <>
+                      <hr className={darkMode ? 'border-zinc-800' : 'border-brand-border-light'} />
+                      <button
+                        onClick={onReset}
+                        className={`w-full rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                          darkMode
+                            ? 'border-brand-danger bg-red-950/20 text-brand-danger hover:bg-red-950/40'
+                            : 'border-brand-danger-bg bg-white text-brand-danger hover:bg-brand-danger-bg'
+                        }`}
+                      >
+                        데모 데이터 초기화
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
