@@ -3207,7 +3207,7 @@ function AdminDashboard({
 
   return (
     <div className="mt-6 space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className={`rounded-lg border p-4 transition-colors duration-200 ${darkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-brand-border text-brand-text'}`}>
           <p className={`text-xs ${darkMode ? 'text-zinc-400' : 'text-brand-text-muted'}`}>재원생 수강 비율</p>
           <div className="mt-2 flex items-end gap-2">
@@ -3218,21 +3218,6 @@ function AdminDashboard({
             <div className="h-1.5 rounded-full bg-brand transition-all" style={{ width: `${participationRate}%` }} />
           </div>
         </div>
-
-        <Link href="/admin/courses" className="block no-underline">
-          <div className={`rounded-lg border p-4 transition-all duration-200 cursor-pointer hover:border-brand hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] ${
-            darkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-brand-border text-brand-text'
-          }`}>
-            <p className={`text-xs ${darkMode ? 'text-zinc-400' : 'text-brand-text-muted'}`}>전체 정원 충족률</p>
-            <div className="mt-2 flex items-end gap-2">
-              <span className="text-2xl font-semibold text-brand-dark dark:text-brand">{fillRate}%</span>
-              <span className={`text-xs ${darkMode ? 'text-zinc-500' : 'text-brand-text-faint'}`}>총 신청 {totalEnrolled}석 / 총 정원 {totalCapacity}석</span>
-            </div>
-            <div className={`mt-2 h-1.5 w-full rounded-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-100'}`}>
-              <div className="h-1.5 rounded-full bg-brand transition-all" style={{ width: `${fillRate}%` }} />
-            </div>
-          </div>
-        </Link>
 
         <Link href="/admin/registrations" className="block no-underline">
           <div className={`rounded-lg border p-4 transition-all duration-200 cursor-pointer hover:border-brand hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] ${
