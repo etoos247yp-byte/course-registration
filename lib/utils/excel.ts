@@ -12,12 +12,13 @@ export function downloadXlsx(workbook: ExcelJS.Workbook, filename: string) {
   });
 }
 
-export function exportStudents(students: { cohortId: string; name: string; school: string; level: string; target: string }[]) {
+export function exportStudents(students: { cohortId: string; name: string; dob: string; school: string; level: string; target: string }[]) {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('학생 목록');
   ws.columns = [
     { header: '반', key: 'cohortId', width: 16 },
     { header: '이름', key: 'name', width: 12 },
+    { header: '생년월일', key: 'dob', width: 14 },
     { header: '학교명', key: 'school', width: 20 },
     { header: '수준', key: 'level', width: 14 },
     { header: '목표', key: 'target', width: 24 },
@@ -107,14 +108,15 @@ export function downloadStudentTemplate() {
   ws.columns = [
     { header: '반', key: 'cohortId', width: 16 },
     { header: '이름', key: 'name', width: 12 },
+    { header: '생년월일', key: 'dob', width: 14 },
     { header: '학교명', key: 'school', width: 20 },
     { header: '수준', key: 'level', width: 14 },
   ];
   ws.getRow(1).font = { bold: true };
   
   // Add sample rows for illustration
-  ws.addRow({ cohortId: '2027-final-6', name: '홍길동', school: '서울고등학교', level: '종합' });
-  ws.addRow({ cohortId: '2027-final-6', name: '성춘향', school: '부산고등학교', level: '수학' });
+  ws.addRow({ cohortId: '2027-final-6', name: '홍길동', dob: '2007-03-18', school: '서울고등학교', level: '종합' });
+  ws.addRow({ cohortId: '2027-final-6', name: '성춘향', dob: '2007-05-22', school: '부산고등학교', level: '수학' });
   
   downloadXlsx(wb, 'student_upload_template.xlsx');
 }
@@ -137,4 +139,3 @@ export function downloadCourseTemplate() {
   
   downloadXlsx(wb, 'course_upload_template.xlsx');
 }
-

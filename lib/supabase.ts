@@ -1,4 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import { assertSupabaseConfigured } from '@/lib/production-config';
+
+assertSupabaseConfigured(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
 export const isSupabaseConfigured = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,

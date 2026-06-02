@@ -89,6 +89,45 @@ const sessionKey = 'course-registration-prototype-session';
 const subjects: Array<PrototypeSubject | '전체'> = ['전체', ...prototypeSubjects];
 const weekDays: PrototypeDay[] = ['월', '화', '수', '목', '금'];
 
+function normalizeImportedDob(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+
+  const dateMatch = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (dateMatch) {
+    const [, year, month, day] = dateMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length === 8) {
+    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+  }
+  if (digits.length === 6) {
+    const yearPrefix = Number(digits.slice(0, 2)) >= 50 ? '19' : '20';
+    return `${yearPrefix}${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4, 6)}`;
+  }
+
+  return trimmed;
+}
+
+function createEmptyPrototypeState(): PrototypeState {
+  const initial = createInitialPrototypeState();
+  return {
+    ...initial,
+    students: [],
+    courses: [],
+    registrations: [],
+    locked: false,
+    currentSeason: 'season-3',
+    registrationClose: '2099-12-31T23:59:00',
+    individualOpenings: [],
+    courseSubmissions: [],
+    confirmedClassPicks: [],
+    changeRequests: [],
+  };
+}
+
 export function PrototypeApp({ view }: { view: View }) {
   const router = useRouter();
   const [state, setState] = React.useState<PrototypeState>(() => createInitialPrototypeState());
@@ -258,49 +297,49 @@ export function PrototypeApp({ view }: { view: View }) {
     router.push('/login');
   }
 
-  async function resetDemo() {
+  async function wipeAllCourseData() {
+    const emptyState = createEmptyPrototypeState();
+
     if (!isSupabaseConfigured) {
-      persistDemoState(createInitialPrototypeState());
-      setMessage('데모 데이터가 초기화되었습니다.');
+      persistDemoState(emptyState);
+      setMessage('모든 수강신청 데이터가 삭제되었습니다.');
       return;
     }
 
     try {
-      // Delete all registrations
-      await supabase.from('registrations').delete().neq('id', '');
-      // Delete all individual openings
-      await supabase.from('individual_openings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      // Reset system settings
-      await supabase.from('system_settings').upsert([
+      const registrationDelete = await supabase.from('registrations').delete().neq('id', '');
+      if (registrationDelete.error) throw registrationDelete.error;
+
+      const openingDelete = await supabase.from('individual_openings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (openingDelete.error) throw openingDelete.error;
+
+      const studentDelete = await supabase.from('students').delete().neq('id', '');
+      if (studentDelete.error) throw studentDelete.error;
+
+      const courseDelete = await supabase.from('courses').delete().neq('id', '');
+      if (courseDelete.error) throw courseDelete.error;
+
+      const settingsDelete = await supabase.from('system_settings').delete().neq('key', '');
+      if (settingsDelete.error) throw settingsDelete.error;
+
+      const { error: settingsError } = await supabase.from('system_settings').upsert([
         { key: 'locked', value: false },
         { key: 'currentSeason', value: 'season-3' },
-        { key: 'registrationClose', value: '2099-12-31T23:59:00' }
+        { key: 'registrationClose', value: '2099-12-31T23:59:00' },
       ]);
+      if (settingsError) {
+        setMessage(`운영 설정 초기화 실패: ${settingsError.message}`);
+        return;
+      }
 
-      // Re-insert initial registrations to match initial state
-      await supabase.from('registrations').insert([
-        { id: 'reg-1',  student_id: 'stu-1', course_id: 'kor-basic',      status: 'active', created_at: '2026-05-01T09:00:00Z' },
-        { id: 'reg-2',  student_id: 'stu-1', course_id: 'eng-reading',    status: 'active', created_at: '2026-05-01T09:01:00Z' },
-        { id: 'reg-3',  student_id: 'stu-1', course_id: 'math-basic',     status: 'active', created_at: '2026-05-01T09:02:00Z' },
-        { id: 'reg-4',  student_id: 'stu-1', course_id: 'science-life',   status: 'active', created_at: '2026-05-01T09:03:00Z' },
-        { id: 'reg-5',  student_id: 'stu-2', course_id: 'math-advanced',  status: 'active', created_at: '2026-05-01T09:05:00Z' },
-        { id: 'reg-6',  student_id: 'stu-2', course_id: 'eng-reading',    status: 'active', created_at: '2026-05-01T09:06:00Z' },
-        { id: 'reg-7',  student_id: 'stu-3', course_id: 'kor-basic',      status: 'active', created_at: '2026-05-01T09:10:00Z' },
-        { id: 'reg-8',  student_id: 'stu-3', course_id: 'social-culture', status: 'active', created_at: '2026-05-01T09:11:00Z' },
-        { id: 'reg-9',  student_id: 'stu-3', course_id: 'kor-literature', status: 'active', created_at: '2026-05-01T09:12:00Z' },
-        { id: 'reg-10', student_id: 'stu-4', course_id: 'math-advanced',  status: 'active', created_at: '2026-05-01T09:15:00Z' },
-        { id: 'reg-11', student_id: 'stu-4', course_id: 'eng-reading',    status: 'active', created_at: '2026-05-01T09:16:00Z' },
-        { id: 'reg-12', student_id: 'stu-4', course_id: 'science-life',   status: 'active', created_at: '2026-05-01T09:17:00Z' },
-        { id: 'reg-13', student_id: 'stu-4', course_id: 'social-culture', status: 'active', created_at: '2026-05-01T09:18:00Z' },
-        { id: 'reg-14', student_id: 'stu-4', course_id: 'kor-literature', status: 'active', created_at: '2026-05-01T09:19:00Z' },
-        { id: 'reg-15', student_id: 'stu-4', course_id: 'math-basic',     status: 'active', created_at: '2026-05-01T09:20:00Z' }
-      ]);
+      const auditLogDelete = await supabase.from('audit_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (auditLogDelete.error) throw auditLogDelete.error;
 
-      setMessage('데모 데이터가 초기화되었습니다.');
+      setMessage('모든 수강신청 데이터가 삭제되었습니다.');
       await loadState();
     } catch (err) {
-      console.error('Error resetting demo:', err);
-      setMessage('데모 초기화 중 오류가 발생했습니다.');
+      console.error('Error wiping course data:', err);
+      setMessage('전체 데이터 삭제 중 오류가 발생했습니다.');
     }
   }
 
@@ -320,11 +359,15 @@ export function PrototypeApp({ view }: { view: View }) {
     const nextState = autoConfirmStudentRegistration(state, activeStudentId);
     if (nextState === state) return;
 
-    if (!isSupabaseConfigured) {
-      persistDemoState(nextState);
-    } else {
-      setState(nextState);
-    }
+    const timer = window.setTimeout(() => {
+      if (!isSupabaseConfigured) {
+        persistDemoState(nextState);
+      } else {
+        setState(nextState);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [activeStudentId, hydrated, persistDemoState, session?.role, state]);
 
   function acknowledgeAutoConfirmNotice() {
@@ -792,6 +835,15 @@ export function PrototypeApp({ view }: { view: View }) {
             rows.forEach((r, i) => {
               const name = (r.이름 || r.name || '').trim();
               if (!name) return;
+              const dob = normalizeImportedDob(
+                r.생년월일 ||
+                r.dob ||
+                r.DOB ||
+                r.birthDate ||
+                r.birth_date ||
+                r['date of birth'] ||
+                '',
+              );
 
               const cohortId = (r.반 || r.cohortId || '2027-final-6').trim();
               const school = (r.학교명 || r.school || '').trim();
@@ -810,12 +862,13 @@ export function PrototypeApp({ view }: { view: View }) {
                 student.school = school || student.school;
                 student.level = level || student.level;
                 student.target = target || student.target;
+                student.dob = dob || student.dob;
               } else {
                 studentId = `stu-import-${Date.now()}-${i}`;
                 student = {
                   id: studentId,
                   name,
-                  dob: '2007-01-01',
+                  dob: dob || '2007-01-01',
                   cohortId,
                   school,
                   level,
@@ -1121,7 +1174,7 @@ export function PrototypeApp({ view }: { view: View }) {
               setMessage('강좌 가져오기 중 오류가 발생했습니다.');
             }
           }}
-          onReset={resetDemo}
+          onReset={wipeAllCourseData}
         />
       )}
     </Shell>
@@ -1985,7 +2038,7 @@ function AdminConsole({
   onRejectChangeRequest: (requestId: string) => void;
   onImportStudents: (rows: Record<string, string>[]) => void;
   onImportCourses: (rows: Record<string, string>[]) => void;
-  onReset: () => void;
+  onReset: () => void | Promise<void>;
   onAdminAddStudent: (student: Omit<PrototypeStudent, 'id'>) => void;
   onAdminDeleteStudents: (studentIds: string[]) => void;
 }) {
@@ -1995,6 +2048,9 @@ function AdminConsole({
   const [selectedSeason, setSelectedSeason] = React.useState(state.currentSeason);
   const [registrationClose, setRegistrationClose] = React.useState(state.registrationClose.slice(0, 16));
   const [showTemplateEditor, setShowTemplateEditor] = React.useState(false);
+  const [showWipeModal, setShowWipeModal] = React.useState(false);
+  const [wipeConfirmation, setWipeConfirmation] = React.useState('');
+  const canConfirmWipe = wipeConfirmation.trim() === '삭제한다';
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   React.useEffect(() => { setSelectedSeason(state.currentSeason); }, [state.currentSeason]);
@@ -2199,21 +2255,20 @@ function AdminConsole({
                   >
                     정정기간 즉시 닫기
                   </button>
-                  {!isSupabaseConfigured && (
-                    <>
-                      <hr className={darkMode ? 'border-zinc-800' : 'border-brand-border-light'} />
-                      <button
-                        onClick={onReset}
-                        className={`w-full rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
-                          darkMode
-                            ? 'border-brand-danger bg-red-950/20 text-brand-danger hover:bg-red-950/40'
-                            : 'border-brand-danger-bg bg-white text-brand-danger hover:bg-brand-danger-bg'
-                        }`}
-                      >
-                        데모 데이터 초기화
-                      </button>
-                    </>
-                  )}
+                  <hr className={darkMode ? 'border-zinc-800' : 'border-brand-border-light'} />
+                  <button
+                    onClick={() => {
+                      setWipeConfirmation('');
+                      setShowWipeModal(true);
+                    }}
+                    className={`w-full rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                      darkMode
+                        ? 'border-brand-danger bg-red-950/20 text-brand-danger hover:bg-red-950/40'
+                        : 'border-brand-danger-bg bg-white text-brand-danger hover:bg-brand-danger-bg'
+                    }`}
+                  >
+                    전체 데이터 삭제
+                  </button>
                 </div>
               </div>
             </div>
@@ -2229,6 +2284,59 @@ function AdminConsole({
             }}
             onClose={() => setShowTemplateEditor(false)}
           />
+          <Modal
+            open={showWipeModal}
+            onClose={() => setShowWipeModal(false)}
+            darkMode={darkMode}
+            title={<span className="text-brand-danger">전체 데이터를 삭제하시겠습니까?</span>}
+            footer={
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowWipeModal(false)}
+                  className={`rounded-md border px-4 py-2 text-sm font-semibold transition-colors ${
+                    darkMode
+                      ? 'border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800'
+                      : 'border-brand-border bg-white text-brand-text hover:bg-brand-bg'
+                  }`}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  disabled={!canConfirmWipe}
+                  onClick={() => {
+                    if (!canConfirmWipe) return;
+                    void onReset();
+                    setShowWipeModal(false);
+                    setWipeConfirmation('');
+                  }}
+                  className="rounded-md bg-brand-danger px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  영구 삭제
+                </button>
+              </>
+            }
+          >
+            <div className="space-y-4">
+              <p className={`text-sm leading-6 ${darkMode ? 'text-zinc-300' : 'text-brand-text-muted'}`}>
+                학생, 강좌, 신청 내역, 개별 정정기간, 운영 설정을 삭제합니다. Supabase 연결 시 백엔드 데이터도 함께 삭제됩니다. 관리자 계정은 유지됩니다.
+              </p>
+              <label className="block text-sm font-medium">
+                <span className={darkMode ? 'text-zinc-200' : 'text-brand-text'}>확인 문구</span>
+                <input
+                  value={wipeConfirmation}
+                  onChange={(event) => setWipeConfirmation(event.target.value)}
+                  placeholder="삭제한다"
+                  className={`mt-2 w-full rounded-md border px-3 py-2 text-sm outline-none transition-colors ${
+                    darkMode
+                      ? 'border-zinc-700 bg-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-brand'
+                      : 'border-brand-border bg-white text-brand-text placeholder:text-brand-text-muted focus:border-brand'
+                  }`}
+                />
+              </label>
+            </div>
+          </Modal>
         </>
       ) : null}
 

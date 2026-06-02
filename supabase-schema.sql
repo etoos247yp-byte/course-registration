@@ -69,7 +69,7 @@ create table system_settings (
 create table admins (
   id text primary key,
   email text not null unique,
-  password text not null, -- Plain text for demo/prototype, can be hashed in production
+  password text not null, -- bcrypt hash
   name text not null,
   role text not null check (role in ('admin', 'super_admin'))
 );
@@ -135,8 +135,8 @@ insert into system_settings (key, value) values
 
 -- Seed admins
 insert into admins (id, email, password, name, role) values
-('admin-1', 'admin@etoos247.kr', 'admin1234', '관리자', 'admin'),
-('admin-2', 'super@etoos247.kr', 'super1234', '최고관리자', 'super_admin');
+('admin-1', 'admin@etoos247.kr', '$2b$10$F3pwGlGUQWg9Ci/5dEmNb.TN3OzNu.Al0qxPw1RilEdBYhPjfkSIG', '관리자', 'admin'),
+('admin-2', 'super@etoos247.kr', '$2b$10$5lhpQRcTjuESZpE/B5rUAOZbwfcaOseU37ez1m5sB6Th2XErN2M5S', '최고관리자', 'super_admin');
 
 -- 6. Add database constraints to prevent seat leaks
 alter table courses add constraint enrolled_capacity_check check (enrolled <= capacity);

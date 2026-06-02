@@ -21,6 +21,7 @@ export interface DataTableProps<T> {
 
 export function DataTable<T>({ data, columns, onRowClick, pageSize = 20 }: DataTableProps<T>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table intentionally returns non-memoizable helpers.
   const table = useReactTable({
     data,
     columns,

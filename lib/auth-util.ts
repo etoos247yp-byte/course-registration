@@ -1,11 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
-
-// JWT Secret Key configuration
-const SECRET_KEY = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'etoos-247-course-registration-secure-secret-key-32bytes-fallback'
-);
+import { getJwtSecretKey } from '@/lib/production-config';
 
 export const SESSION_COOKIE_NAME = 'session';
 
@@ -38,7 +34,7 @@ export async function createSessionToken(payload: SessionPayload): Promise<strin
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('2h') // Session is valid for 2 hours
-    .sign(SECRET_KEY);
+    .sign(getJwtSecretKey());
 }
 
 /**
@@ -46,7 +42,7 @@ export async function createSessionToken(payload: SessionPayload): Promise<strin
  */
 export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, SECRET_KEY, {
+    const { payload } = await jwtVerify(token, getJwtSecretKey(), {
       algorithms: ['HS256'],
     });
     return payload as SessionPayload;

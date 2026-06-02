@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
-
-const SECRET_KEY = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'etoos-247-course-registration-secure-secret-key-32bytes-fallback'
-);
+import { getJwtSecretKey } from '@/lib/production-config';
 
 const SESSION_COOKIE_NAME = 'session';
 
@@ -18,7 +15,7 @@ type SessionPayload = {
 const ADMIN_ROUTE_PREFIX = '/admin';
 const STUDENT_ROUTES = ['/dashboard', '/catalog', '/cart', '/schedule', '/course'];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 1. Retrieve the session cookie
@@ -27,7 +24,7 @@ export async function middleware(request: NextRequest) {
 
   if (sessionCookie) {
     try {
-      const { payload } = await jwtVerify(sessionCookie, SECRET_KEY, {
+      const { payload } = await jwtVerify(sessionCookie, getJwtSecretKey(), {
         algorithms: ['HS256'],
       });
       sessionPayload = payload as SessionPayload;

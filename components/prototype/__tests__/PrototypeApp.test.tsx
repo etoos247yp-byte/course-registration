@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
+import ExcelJS from 'exceljs';
 import { PrototypeApp } from '../PrototypeApp';
 import { createInitialPrototypeState } from '@/lib/prototype-data';
 
@@ -285,14 +286,13 @@ describe('PrototypeApp', () => {
     expect(within(engReadingCard).getByRole('button', { name: '승인 대기' })).toBeInTheDocument();
   });
 
-  test('allows admin to reset the demo data', async () => {
+  test('requires typed confirmation before wiping all course registration data', async () => {
     window.localStorage.setItem(
       'course-registration-prototype-session',
       JSON.stringify({ role: 'admin', id: 'admin-1', name: '관리자' }),
     );
 
     const state = createInitialPrototypeState();
-    // Modify the state significantly so we can verify if it gets reset
     state.locked = true;
     state.currentSeason = 'season-4';
     window.localStorage.setItem('course-registration-prototype-state', JSON.stringify(state));
@@ -302,13 +302,67 @@ describe('PrototypeApp', () => {
     expect(await screen.findByRole('heading', { name: '관리자 콘솔' })).toBeInTheDocument();
     expect(screen.getByText('수강신청 잠김')).toBeInTheDocument();
 
-    const resetBtn = screen.getByRole('button', { name: '데모 데이터 초기화' });
-    await userEvent.click(resetBtn);
+    await userEvent.click(screen.getByRole('button', { name: '전체 데이터 삭제' }));
 
-    // It should display a message confirming reset
-    expect(await screen.findByText('데모 데이터가 초기화되었습니다.')).toBeInTheDocument();
-    
-    // Check that the state is restored to initial defaults
+    expect(await screen.findByText('전체 데이터를 삭제하시겠습니까?')).toBeInTheDocument();
+    const confirmButton = screen.getByRole('button', { name: '영구 삭제' });
+    expect(confirmButton).toBeDisabled();
+
+    await userEvent.type(screen.getByLabelText('확인 문구'), '삭제한다');
+    expect(confirmButton).toBeEnabled();
+    await userEvent.click(confirmButton);
+
+    expect(await screen.findByText('모든 수강신청 데이터가 삭제되었습니다.')).toBeInTheDocument();
     expect(screen.getByText('수강신청 가능')).toBeInTheDocument();
+
+    const saved = JSON.parse(window.localStorage.getItem('course-registration-prototype-state') ?? '{}');
+    expect(saved.students).toEqual([]);
+    expect(saved.courses).toEqual([]);
+    expect(saved.registrations).toEqual([]);
+    expect(saved.individualOpenings).toEqual([]);
+  });
+  test('imports student DOB from batch upload so student login credentials are preserved', async () => {
+    window.localStorage.setItem(
+      'course-registration-prototype-session',
+      JSON.stringify({ role: 'admin', id: 'admin-1', name: 'admin' }),
+    );
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('students');
+    worksheet.columns = [
+      { header: 'name', key: 'name' },
+      { header: 'dob', key: 'dob' },
+      { header: 'cohortId', key: 'cohortId' },
+      { header: 'school', key: 'school' },
+      { header: 'level', key: 'level' },
+      { header: 'target', key: 'target' },
+    ];
+    worksheet.addRow({
+      name: 'Batch Student',
+      dob: '2008-09-10',
+      cohortId: '2027-final-6',
+      school: 'Import High',
+      level: 'General',
+      target: 'Test',
+    });
+    const buffer = await workbook.xlsx.writeBuffer();
+    const file = new File([buffer], 'students.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+
+    render(<PrototypeApp view="admin-students" />);
+
+    const upload = await waitFor(() => {
+      const input = document.querySelector<HTMLInputElement>('#student-excel-upload');
+      expect(input).not.toBeNull();
+      return input!;
+    });
+    await userEvent.upload(upload!, file);
+
+    await screen.findByText(/1명의 학생/);
+    const saved = JSON.parse(window.localStorage.getItem('course-registration-prototype-state') ?? '{}');
+    const imported = saved.students.find((student: { name: string }) => student.name === 'Batch Student');
+
+    expect(imported).toMatchObject({ dob: '2008-09-10' });
   });
 });
