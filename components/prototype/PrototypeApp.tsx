@@ -3119,11 +3119,26 @@ function AdminDashboard({
   const maxInstEnrolled = Math.max(...instructorStats.map((i) => i.enrolled), 1);
 
   // Recharts Chart Data and Configs
-  const courseChartData = state.courses.map((c) => ({
+  const getSubjectPriority = (subj: string) => {
+    if (subj === '국어') return 1;
+    if (subj === '수학') return 2;
+    if (subj === '영어') return 3;
+    if (subj.includes('탐')) return 4;
+    return 5;
+  };
+
+  const sortedCourses = [...state.courses].sort((a, b) => {
+    const pA = getSubjectPriority(a.subject || '');
+    const pB = getSubjectPriority(b.subject || '');
+    if (pA !== pB) return pA - pB;
+    return a.title.localeCompare(b.title, 'ko');
+  });
+
+  const courseChartData = sortedCourses.map((c) => ({
     name: c.title,
     enrolled: c.enrolled,
     capacity: c.capacity,
-    displayLabel: `${c.enrolled}/${c.capacity}명`,
+    displayLabel: `${c.enrolled}명`,
   }));
 
   const courseChartConfig = {
@@ -3236,7 +3251,7 @@ function AdminDashboard({
         <Card darkMode={darkMode}>
           <CardHeader>
             <CardTitle>강좌별 신청 현황</CardTitle>
-            <CardDescription darkMode={darkMode}>각 강좌별 정원 대비 신청 비율</CardDescription>
+            <CardDescription darkMode={darkMode}>각 강좌별 현재 수강 신청 인원 (국수영탐 순)</CardDescription>
           </CardHeader>
           <CardContent className="h-[280px] w-full pr-4">
             <ChartContainer config={courseChartConfig}>
