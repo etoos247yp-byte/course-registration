@@ -635,22 +635,23 @@ export function PrototypeApp({ view }: { view: View }) {
               await loadState();
             }
           }}
-          onGrantStudentOpening={async (studentId) => {
+          onGrantStudentOpening={async (studentId, openStr, closeStr) => {
             if (!isSupabaseConfigured) {
+              const filteredOpenings = state.individualOpenings.filter(o => o.studentId !== studentId);
               persistDemoState({
                 ...state,
                 locked: false,
                 individualOpenings: [
-                  ...state.individualOpenings,
+                  ...filteredOpenings,
                   {
                     studentId,
-                    open: '2026-05-01T00:00:00',
-                    close: '2099-12-31T23:59:00',
-                    reason: 'demo opening',
+                    open: openStr,
+                    close: closeStr,
+                    reason: '정정기간',
                   },
                 ],
               });
-              setMessage('해당 학생에게 개별 수강신청을 오픈했습니다.');
+              setMessage('해당 학생의 정정기간을 설정했습니다.');
               return;
             }
 
@@ -658,19 +659,25 @@ export function PrototypeApp({ view }: { view: View }) {
               .from('system_settings')
               .upsert({ key: 'locked', value: false });
 
+            // Remove existing opening first if any to avoid duplicates
+            await supabase
+              .from('individual_openings')
+              .delete()
+              .eq('student_id', studentId);
+
             const { error: err2 } = await supabase
               .from('individual_openings')
               .insert({
                 student_id: studentId,
-                open: '2026-05-01T00:00:00',
-                close: '2099-12-31T23:59:00',
-                reason: '신규 입소생',
+                open: openStr,
+                close: closeStr,
+                reason: '정정기간',
               });
 
             if (err1 || err2) {
-              setMessage('개별 오픈 실패');
+              setMessage('정정기간 설정 실패');
             } else {
-              setMessage('해당 학생에게 개별 수강신청을 오픈했습니다.');
+              setMessage('해당 학생의 정정기간을 설정했습니다.');
               await loadState();
             }
           }}
@@ -1968,7 +1975,7 @@ function AdminConsole({
   onSetCorrectionOpen: (open: boolean) => void;
   onUpdateSchedule: (seasonId: string, registrationClose: string) => void;
   onUpdateTemplates: (templates: SeasonTemplate[]) => void;
-  onGrantStudentOpening: (studentId: string) => void;
+  onGrantStudentOpening: (studentId: string, open: string, close: string) => void;
   onAdminAddClass: (studentId: string, courseId: string) => void;
   onAdminDropClass: (studentId: string, courseId: string) => void;
   onApproveChangeRequest: (requestId: string) => void;
@@ -2376,6 +2383,88 @@ function AddStudentModal({
   );
 }
 
+function CorrectionPeriodModal({
+  student,
+  darkMode = false,
+  onClose,
+  onSave,
+}: {
+  student: PrototypeStudent;
+  darkMode?: boolean;
+  onClose: () => void;
+  onSave: (open: string, close: string) => void;
+}) {
+  const getLocalDateTimeString = (date: Date) => {
+    const tzoffset = date.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(date.getTime() - tzoffset)).toISOString().slice(0, 16);
+    return localISOTime;
+  };
+
+  const now = new Date();
+  const defaultOpen = getLocalDateTimeString(now);
+  
+  const threeDaysLater = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  threeDaysLater.setHours(23, 59, 0, 0);
+  const defaultClose = getLocalDateTimeString(threeDaysLater);
+
+  const [openVal, setOpenVal] = React.useState(defaultOpen);
+  const [closeVal, setCloseVal] = React.useState(defaultClose);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!openVal || !closeVal) return;
+    onSave(openVal, closeVal);
+  };
+
+  return (
+    <Modal
+      title="정정기간 설정"
+      open={true}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            취소
+          </Button>
+          <Button variant="primary" onClick={handleSubmit}>
+            설정 완료
+          </Button>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4 py-2 text-left">
+        <div>
+          <p className={`text-sm mb-3 ${darkMode ? 'text-zinc-300' : 'text-zinc-650'}`}>
+            학생 <strong className={darkMode ? 'text-zinc-50' : 'text-zinc-900'}>{student.name}</strong> ({student.cohortId})의 개별 수강 신청 정정기간을 설정합니다.
+          </p>
+        </div>
+        <div>
+          <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-zinc-300' : 'text-gray-700'}`}>정정 시작 일시</label>
+          <input
+            type="datetime-local"
+            value={openVal}
+            onChange={(e) => setOpenVal(e.target.value)}
+            className={`w-full rounded-md border px-3 py-2 text-sm outline-none ${
+              darkMode ? 'bg-zinc-800 border-zinc-700 text-zinc-100' : 'bg-white border-gray-300 text-zinc-900'
+            }`}
+          />
+        </div>
+        <div>
+          <label className={`block text-xs font-semibold mb-1 ${darkMode ? 'text-zinc-300' : 'text-gray-700'}`}>정정 종료 일시</label>
+          <input
+            type="datetime-local"
+            value={closeVal}
+            onChange={(e) => setCloseVal(e.target.value)}
+            className={`w-full rounded-md border px-3 py-2 text-sm outline-none ${
+              darkMode ? 'bg-zinc-800 border-zinc-700 text-zinc-100' : 'bg-white border-gray-300 text-zinc-900'
+            }`}
+          />
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 function AdminStudents({
   state,
   darkMode = false,
@@ -2390,7 +2479,7 @@ function AdminStudents({
   darkMode?: boolean;
   onAdminAddClass: (studentId: string, courseId: string) => void;
   onAdminDropClass: (studentId: string, courseId: string) => void;
-  onGrantStudentOpening: (studentId: string) => void;
+  onGrantStudentOpening: (studentId: string, open: string, close: string) => void;
   onImportStudents: (rows: Record<string, string>[]) => void;
   onAdminAddStudent: (student: Omit<PrototypeStudent, 'id'>) => void;
   onAdminDeleteStudents: (studentIds: string[]) => void;
@@ -2398,7 +2487,7 @@ function AdminStudents({
   const [query, setQuery] = React.useState('');
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [showAddModal, setShowAddModal] = React.useState(false);
-  const [viewMode, setViewMode] = React.useState<'excel' | 'table'>('table');
+  const [openingStudent, setOpeningStudent] = React.useState<PrototypeStudent | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   const filtered = state.students.filter((s) => {
@@ -2583,16 +2672,20 @@ function AdminStudents({
                     <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800' : 'border-zinc-250'}`}>
                       <div className="flex items-center gap-1.5">
                         <button
-                          onClick={() => onGrantStudentOpening(student.id)}
+                          onClick={() => setOpeningStudent(student)}
                           className={`rounded border px-2 py-1 text-[10px] font-semibold transition-colors shrink-0 ${
                             darkMode
                               ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-850 hover:text-white'
                               : 'border-zinc-300 text-brand-text bg-white hover:bg-brand-bg'
                           }`}
                         >
-                          신규 입소생 오픈
+                          정정기간 열기
                         </button>
-                        {opening ? <span className={`text-[10px] font-semibold shrink-0 text-brand ${darkMode ? 'text-brand' : 'text-brand'}`}>오픈됨</span> : null}
+                        {opening ? (
+                          <div className="text-[10px] font-semibold text-brand mt-1 leading-tight shrink-0">
+                            정정기간: {opening.open.substring(5, 16).replace('T', ' ')} ~ {opening.close.substring(5, 16).replace('T', ' ')}
+                          </div>
+                        ) : null}
                         <button
                           onClick={() => {
                             if (confirm(`학생 '${student.name}'을(를) 정말 삭제하시겠습니까?\n해당 학생의 모든 수강 신청 기록도 함께 삭제됩니다.`)) {
@@ -2621,6 +2714,17 @@ function AdminStudents({
           onSave={(student) => {
             onAdminAddStudent(student);
             setShowAddModal(false);
+          }}
+        />
+      )}
+      {openingStudent && (
+        <CorrectionPeriodModal
+          student={openingStudent}
+          darkMode={darkMode}
+          onClose={() => setOpeningStudent(null)}
+          onSave={(openDate, closeDate) => {
+            onGrantStudentOpening(openingStudent.id, openDate, closeDate);
+            setOpeningStudent(null);
           }}
         />
       )}
