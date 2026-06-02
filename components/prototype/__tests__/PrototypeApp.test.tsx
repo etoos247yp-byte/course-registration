@@ -52,7 +52,7 @@ describe('PrototypeApp', () => {
     );
     render(<PrototypeApp view="catalog" />);
 
-    expect(await screen.findByRole('heading', { name: '수강 신청' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /수강 신청/ })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '강좌 탐색' })).not.toBeInTheDocument();
     expect(screen.queryByText('시간 충돌과 정원 상태를 보면서 수강할 강좌를 담으세요.')).not.toBeInTheDocument();
   });
@@ -68,7 +68,7 @@ describe('PrototypeApp', () => {
 
     render(<PrototypeApp view="catalog" />);
 
-    expect(await screen.findByRole('heading', { name: '수강 신청' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /수강 신청/ })).toBeInTheDocument();
     const selectedCardStatuses = screen.getAllByRole('button', { name: '수강 중' });
     selectedCardStatuses.forEach((button) => expect(button).toBeDisabled());
 
@@ -150,7 +150,7 @@ describe('PrototypeApp', () => {
 
     render(<PrototypeApp view="catalog" />);
 
-    expect(await screen.findByRole('heading', { name: '수강 신청' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /수강 신청/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '신청 요약' })).toBeInTheDocument();
     expect(screen.getByText('Class B')).toBeInTheDocument();
 
@@ -229,7 +229,7 @@ describe('PrototypeApp', () => {
 
     render(<PrototypeApp view="catalog" />);
 
-    expect(await screen.findByRole('heading', { name: '수강 신청' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /수강 신청/ })).toBeInTheDocument();
     
     // The course "독서 기본기 회복" should initially be '수강 중'
     const leftCardButton = screen.getAllByRole('button', { name: '수강 중' })[0];
@@ -252,7 +252,7 @@ describe('PrototypeApp', () => {
     expect(updatedLeftButtons.length).toBeGreaterThanOrEqual(2);
   });
 
-  test('adds a course automatically if student has submitted but not confirmed yet', async () => {
+  test('adds a course with admin approval if student has submitted but not confirmed yet', async () => {
     window.localStorage.setItem(
       'course-registration-prototype-session',
       JSON.stringify({ role: 'student', id: 'stu-1', name: '김민준' }),
@@ -271,18 +271,18 @@ describe('PrototypeApp', () => {
 
     render(<PrototypeApp view="catalog" />);
 
-    expect(await screen.findByRole('heading', { name: '수강 신청' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /수강 신청/ })).toBeInTheDocument();
     
     const engReadingCard = screen.getByText('영어 빈칸과 순서').closest('article')!;
     const addButton = within(engReadingCard).getByRole('button', { name: '수강신청' });
     
     await userEvent.click(addButton);
 
-    // Verify it is automatically added
-    expect(await screen.findByText('강좌를 신청했습니다.')).toBeInTheDocument();
+    // Verify it is NOT automatically added, but instead goes to change request
+    expect(await screen.findByText('강의 변경 신청이 접수되었습니다. 관리자 승인 후 반영됩니다.')).toBeInTheDocument();
 
-    // Verify that the left-hand side card's button has turned to '수강 중'
-    expect(within(engReadingCard).getByRole('button', { name: '수강 중' })).toBeInTheDocument();
+    // Verify that the left-hand side card's button has turned to '승인 대기'
+    expect(within(engReadingCard).getByRole('button', { name: '승인 대기' })).toBeInTheDocument();
   });
 
   test('allows admin to reset the demo data', async () => {

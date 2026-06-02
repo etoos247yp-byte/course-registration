@@ -24,6 +24,9 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Pill } from '@/components/ui/Pill';
 import { SmartDateInput } from '@/components/ui/SmartDateInput';
+import { Bar, BarChart, XAxis, YAxis, Cell } from 'recharts';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { calculateAutoCloseDate } from '@/lib/utils/date-shorthand';
 import { exportStudents, exportCourses, exportRegistrations, parseExcelFile } from '@/lib/utils/excel';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
@@ -68,6 +71,7 @@ import {
   rejectChangeRequest,
   submitChangeRequest,
   submitStudentCourseSelection,
+  type PrototypeBlock,
   type PrototypeCourse,
   type PrototypeDay,
   type PrototypeRegistration,
@@ -417,7 +421,7 @@ export function PrototypeApp({ view }: { view: View }) {
       session={session}
       onSignOut={signOut}
       darkMode={isAdminView && isAdminDarkMode}
-      onToggleDarkMode={() => setIsAdminDarkMode(!isAdminDarkMode)}
+      onToggleDarkMode={isAdminView ? () => setIsAdminDarkMode(!isAdminDarkMode) : undefined}
     >
       {message ? (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 transition-all duration-300">
@@ -500,7 +504,7 @@ export function PrototypeApp({ view }: { view: View }) {
             setMessage('수강신청이 확정되었습니다.');
           }}
           onAdd={async (courseId) => {
-            if (isStudentConfirmed) {
+            if (hasLockedCourseSelection) {
               const requestResult = submitChangeRequest(state, activeStudentId, 'add', courseId, getVerifiedNow());
               if (requestResult.ok) {
                 if (!isSupabaseConfigured) persistDemoState(requestResult.state);
@@ -924,6 +928,188 @@ export function PrototypeApp({ view }: { view: View }) {
               setMessage('학생 및 강좌 가져오기 중 오류가 발생했습니다.');
             }
           }}
+          onImportCourses={async (rows) => {
+            const newCourses: PrototypeCourse[] = [];
+            const existingCourses = [...state.courses];
+            let importedCount = 0;
+
+            rows.forEach((r, i) => {
+              const title = (
+                r.강좌명 ||
+                r.title ||
+                r.강좌 ||
+                r.과목명 ||
+                r.name ||
+                r.course_name ||
+                ''
+              ).trim();
+              if (!title) return;
+
+              const code = (
+                r.강좌코드 ||
+                r.코드 ||
+                r.code ||
+                r.course_code ||
+                `CR-${Date.now()}-${i}`
+              ).trim();
+
+              const subjectStr = (r.교과 || r.과목 || r.구분 || r.subject || r.category || '국어').trim();
+              let subject: PrototypeSubject = '국어';
+              if (prototypeSubjects.includes(subjectStr as any)) {
+                subject = subjectStr as PrototypeSubject;
+              } else if (subjectStr.includes('수학') || subjectStr.includes('수')) {
+                subject = '수학';
+              } else if (subjectStr.includes('영어') || subjectStr.includes('영')) {
+                subject = '영어';
+              } else if (subjectStr.includes('사회') || subjectStr.includes('사')) {
+                subject = '사회탐구';
+              } else if (subjectStr.includes('과학') || subjectStr.includes('과')) {
+                subject = '과학탐구';
+              }
+
+              const instructor = (r.강사 || r.강사명 || r.교사 || r.instructor || r.teacher || '미지정').trim();
+              const level = (r.수준 || r.대상 || r.level || r.target || '전체').trim();
+              const credits = parseInt(r.학점 || r.시수 || r.credits || r.hours || '2') || 2;
+              const capacity = parseInt(r.정원 || r.인원 || r.capacity || r.max_students || '30') || 30;
+              const summary = (r.요약 || r.설명 || r.summary || r.description || '').trim();
+
+              // Extract season
+              const seasonCol = (r.시즌 || r.시즌ID || r.season || r.seasonId || '').trim();
+              let seasonId = state.currentSeason; // Default
+              if (seasonCol) {
+                const foundSeason = state.seasonTemplates.find(
+                  (s) => s.id.toLowerCase() === seasonCol.toLowerCase() || s.name.includes(seasonCol)
+                );
+                if (foundSeason) {
+                  seasonId = foundSeason.id;
+                } else {
+                  const digits = seasonCol.match(/\d+/);
+                  if (digits) {
+                    const parsedId = `season-${digits[0]}`;
+                    if (state.seasonTemplates.some((s) => s.id === parsedId)) {
+                      seasonId = parsedId;
+                    }
+                  }
+                }
+              }
+
+              // Parse meetings
+              const meetingsStr = (r.시간 || r.요일 || r.시간표 || r.time || r.meetings || '').trim();
+              let meetings: { day: PrototypeDay; block: PrototypeBlock; time: string }[] = [];
+
+              if (meetingsStr) {
+                if (meetingsStr.startsWith('[') && meetingsStr.endsWith(']')) {
+                  try {
+                    meetings = JSON.parse(meetingsStr);
+                  } catch (e) {
+                    meetings = [];
+                  }
+                }
+
+                if (meetings.length === 0) {
+                  const parts = meetingsStr.split(/[,;]+/).map((p) => p.trim()).filter(Boolean);
+                  parts.forEach((part) => {
+                    const cleanPart = part.replace(/\s+/g, '');
+                    const day = cleanPart.charAt(0) as PrototypeDay;
+                    const block = cleanPart.charAt(1) as PrototypeBlock;
+                    if (['월', '화', '수', '목', '금'].includes(day) && ['A', 'B', 'C', 'D'].includes(block)) {
+                      meetings.push({
+                        day,
+                        block,
+                        time: blockLabels[block] || '08:20-10:00',
+                      });
+                    }
+                  });
+                }
+              }
+
+              if (meetings.length === 0) {
+                meetings = [{ day: '월', block: 'A', time: '08:20-10:00' }];
+              }
+
+              const courseId = (r.id || r.courseId || `course-${code.toLowerCase()}`).trim();
+
+              let course = existingCourses.find(
+                (c) => c.code.toLowerCase() === code.toLowerCase()
+              );
+
+              if (course) {
+                course.title = title;
+                course.subject = subject;
+                course.instructor = instructor;
+                course.level = level;
+                course.credits = credits;
+                course.capacity = capacity;
+                course.meetings = meetings;
+                course.summary = summary;
+                course.seasonId = seasonId;
+              } else {
+                course = {
+                  id: courseId,
+                  code,
+                  seasonId,
+                  subject,
+                  title,
+                  instructor,
+                  level,
+                  credits,
+                  capacity,
+                  enrolled: 0,
+                  meetings,
+                  summary,
+                };
+                existingCourses.push(course);
+                newCourses.push(course);
+                importedCount++;
+              }
+            });
+
+            if (importedCount === 0 && newCourses.length === 0) {
+              setMessage('새로 추가되거나 업데이트된 강좌 정보가 없습니다.');
+              return;
+            }
+
+            if (!isSupabaseConfigured) {
+              persistDemoState({
+                ...state,
+                courses: existingCourses,
+              });
+              setMessage(`${importedCount}개의 신규 강좌를 가져왔습니다.`);
+              return;
+            }
+
+            try {
+              const upsertList = existingCourses.map((c) => ({
+                id: c.id,
+                code: c.code,
+                seasonId: c.seasonId || state.currentSeason || 'season-3',
+                subject: c.subject,
+                title: c.title,
+                instructor: c.instructor,
+                level: c.level,
+                credits: c.credits,
+                capacity: c.capacity,
+                enrolled: c.enrolled,
+                meetings: JSON.stringify(c.meetings),
+                summary: c.summary,
+              }));
+
+              const { error: courseError } = await supabase.from('courses').upsert(
+                upsertList,
+                { onConflict: 'id' },
+              );
+
+              if (courseError) {
+                setMessage(`강좌 가져오기 실패: ${courseError.message}`);
+                return;
+              }
+
+              setMessage(`${importedCount}개의 신규 강좌를 가져왔습니다.`);
+              await loadState();
+            } catch (err) {
+              setMessage('강좌 가져오기 중 오류가 발생했습니다.');
+            }
+          }}
           onReset={resetDemo}
         />
       )}
@@ -1163,10 +1349,14 @@ function Catalog({
   const active = getStudentCourses(state, studentId);
   const hasLockedCourseSelection = isSubmitted || isConfirmed;
   const filtered = state.courses.filter((course) => {
+    const matchesSeason = !course.seasonId || course.seasonId === state.currentSeason;
     const matchesSubject = subject === '전체' || course.subject === subject;
     const matchesQuery = `${course.title} ${course.instructor} ${course.code}`.toLowerCase().includes(query.toLowerCase());
-    return matchesSubject && matchesQuery;
+    return matchesSeason && matchesSubject && matchesQuery;
   });
+
+  const activeSeason = state.seasonTemplates.find((s) => s.id === state.currentSeason);
+  const seasonSuffix = activeSeason ? ` (${activeSeason.name})` : '';
 
   function handleAdd(courseId: string) {
     onAdd(courseId);
@@ -1175,7 +1365,7 @@ function Catalog({
   }
 
   return (
-    <Page title="수강 신청">
+    <Page title={`수강 신청${seasonSuffix}`}>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div>
           <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1745,6 +1935,7 @@ function AdminConsole({
   onApproveChangeRequest,
   onRejectChangeRequest,
   onImportStudents,
+  onImportCourses,
   onReset,
   onAdminAddStudent,
   onAdminDeleteStudents,
@@ -1762,6 +1953,7 @@ function AdminConsole({
   onApproveChangeRequest: (requestId: string) => void;
   onRejectChangeRequest: (requestId: string) => void;
   onImportStudents: (rows: Record<string, string>[]) => void;
+  onImportCourses: (rows: Record<string, string>[]) => void;
   onReset: () => void;
   onAdminAddStudent: (student: Omit<PrototypeStudent, 'id'>) => void;
   onAdminDeleteStudents: (studentIds: string[]) => void;
@@ -2021,7 +2213,7 @@ function AdminConsole({
       ) : null}
 
       {view === 'admin-courses' ? (
-        <AdminCourses state={state} darkMode={darkMode} />
+        <AdminCourses state={state} darkMode={darkMode} onImportCourses={onImportCourses} />
       ) : null}
 
       {view === 'admin-registrations' ? (
@@ -2241,20 +2433,20 @@ function AdminStudents({
         >
           Excel 내보내기
         </button>
-        <label className={`cursor-pointer rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
+        <label htmlFor="student-excel-upload" className={`cursor-pointer rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
           darkMode
             ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-850 bg-zinc-800 hover:text-white'
             : 'border-brand-border text-brand-text hover:bg-brand-bg'
         }`}>
           Excel 가져오기
-          <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" />
+          <input id="student-excel-upload" ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" />
         </label>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[950px] text-sm">
-          <thead className={darkMode ? 'bg-zinc-800/80 text-zinc-200' : 'bg-brand-bg'}>
+        <table className="w-full min-w-[1000px] border-collapse border border-zinc-300 dark:border-zinc-700 text-sm">
+          <thead className={darkMode ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100/90 text-zinc-700'}>
             <tr>
-              <th className={`border-b px-3 py-2 text-left font-semibold w-8 ${darkMode ? 'border-zinc-800' : 'border-brand-border'}`}>
+              <th className={`border border-zinc-300 dark:border-zinc-700 w-8 select-none ${darkMode ? 'border-zinc-700' : ''}`}>
                 <input
                   type="checkbox"
                   checked={filtered.length > 0 && selectedIds.size === filtered.length}
@@ -2268,11 +2460,14 @@ function AdminStudents({
                   className="rounded border-gray-300 text-brand focus:ring-brand"
                 />
               </th>
-              {['반', '이름', '학교명', '수준', '목표', '현재 강좌', '강좌 편집', '관리'].map((header) => (
+              <th className={`border border-zinc-300 dark:border-zinc-700 text-center font-mono text-[10px] w-8 select-none text-zinc-400 dark:text-zinc-500 ${darkMode ? 'border-zinc-700 bg-zinc-800/30' : 'bg-zinc-50'}`}>
+                A
+              </th>
+              {['반 (B)', '이름 (C)', '학교명 (D)', '수준 (E)', '목표 (F)', '현재 강좌 (G)', '강좌 편집 (H)', '관리 (I)'].map((header) => (
                 <th
                   key={header}
-                  className={`border-b px-3 py-2 text-left font-semibold ${
-                    darkMode ? 'border-zinc-800 text-zinc-300' : 'border-brand-border'
+                  className={`border border-zinc-300 dark:border-zinc-700 px-2 py-1.5 text-left font-semibold text-xs ${
+                    darkMode ? 'border-zinc-700 text-zinc-300' : 'border-zinc-300 text-zinc-700'
                   }`}
                 >
                   {header}
@@ -2281,19 +2476,21 @@ function AdminStudents({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((student) => {
+            {filtered.map((student, idx) => {
               const opening = state.individualOpenings.find((item) => item.studentId === student.id);
               const studentCourses = getStudentCourses(state, student.id);
               const activeIds = new Set(studentCourses.map((course) => course.id));
-              const availableCourses = state.courses.filter((course) => !activeIds.has(course.id));
+              const availableCourses = state.courses.filter(
+                (course) => (!course.seasonId || course.seasonId === state.currentSeason) && !activeIds.has(course.id)
+              );
               return (
                 <tr
                   key={student.id}
                   className={`transition-colors ${
-                    darkMode ? 'hover:bg-zinc-800/20' : 'hover:bg-brand-bg/40'
+                    darkMode ? 'hover:bg-zinc-850/50' : 'hover:bg-zinc-50'
                   }`}
                 >
-                  <td className={`border-b px-3 py-3 ${darkMode ? 'border-zinc-850' : 'border-brand-border'}`}>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2 py-1.5 text-center text-xs text-zinc-400 select-none ${darkMode ? 'border-zinc-800' : ''}`}>
                     <input
                       type="checkbox"
                       checked={selectedIds.has(student.id)}
@@ -2309,23 +2506,26 @@ function AdminStudents({
                       className="rounded border-gray-300 text-brand focus:ring-brand"
                     />
                   </td>
-                  <td className={`border-b px-3 py-3 text-xs font-semibold ${darkMode ? 'border-zinc-850 text-zinc-400' : 'border-brand-border'}`}>{student.cohortId}</td>
-                  <td className={`border-b px-3 py-3 font-semibold ${darkMode ? 'border-zinc-850 text-zinc-200' : 'border-brand-border'}`}>{student.name}</td>
-                  <td className={`border-b px-3 py-3 text-xs ${darkMode ? 'border-zinc-850 text-zinc-450' : 'border-brand-border'}`}>{student.school}</td>
-                  <td className={`border-b px-3 py-3 ${darkMode ? 'border-zinc-850 text-zinc-300' : 'border-brand-border'}`}>{student.level}</td>
-                  <td className={`border-b px-3 py-3 text-xs ${darkMode ? 'border-zinc-850 text-zinc-400' : 'border-brand-border'}`}>{student.target}</td>
-                  <td className={`border-b px-3 py-3 ${darkMode ? 'border-zinc-850' : 'border-brand-border'}`}>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 text-center font-mono text-[10px] text-zinc-400 dark:text-zinc-500 select-none ${darkMode ? 'border-zinc-800 bg-zinc-800/30' : 'bg-zinc-50'}`}>
+                    {idx + 1}
+                  </td>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs font-mono font-semibold ${darkMode ? 'border-zinc-800 text-zinc-450' : 'border-zinc-250 text-zinc-500'}`}>{student.cohortId}</td>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs font-semibold ${darkMode ? 'border-zinc-800 text-zinc-200' : 'border-zinc-250 text-brand-text'}`}>{student.name}</td>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800 text-zinc-405' : 'border-zinc-250 text-brand-text-muted'}`}>{student.school}</td>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800 text-zinc-300' : 'border-zinc-250 text-brand-text'}`}>{student.level}</td>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800 text-zinc-400' : 'border-zinc-250 text-brand-text-muted'}`}>{student.target}</td>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800' : 'border-zinc-250'}`}>
                     <div className="space-y-1.5">
-                      {studentCourses.length === 0 ? <span className={`text-xs ${darkMode ? 'text-zinc-500' : 'text-brand-text-muted'}`}>없음</span> : null}
+                      {studentCourses.length === 0 ? <span className={`text-[11px] ${darkMode ? 'text-zinc-500' : 'text-brand-text-faint'}`}>없음</span> : null}
                       {studentCourses.map((course) => (
-                        <div key={course.id} className={`flex items-center justify-between gap-2 rounded-md border px-2 py-1 ${
-                          darkMode ? 'border-zinc-700 bg-zinc-800/30' : 'border-brand-border bg-white'
+                        <div key={course.id} className={`flex items-center justify-between gap-1.5 rounded border px-2 py-0.5 ${
+                          darkMode ? 'border-zinc-700 bg-zinc-800/40 text-zinc-300' : 'border-brand-border bg-white text-brand-text'
                         }`}>
-                          <span className="text-xs">{course.title}</span>
+                          <span className="text-[11px] leading-tight">{course.title}</span>
                           <button
                             onClick={() => onAdminDropClass(student.id, course.id)}
-                            className={`rounded border px-1.5 py-0.5 text-[10px] transition-colors ${
-                              darkMode ? 'border-zinc-750 text-zinc-400 hover:bg-zinc-800 hover:text-white' : 'border-brand-border text-brand-text hover:bg-brand-bg'
+                            className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold transition-colors shrink-0 ${
+                              darkMode ? 'border-zinc-650 text-zinc-450 hover:bg-zinc-700 hover:text-white' : 'border-gray-200 bg-gray-50 text-zinc-500 hover:bg-gray-150 hover:text-zinc-700'
                             }`}
                           >
                             제외
@@ -2334,7 +2534,7 @@ function AdminStudents({
                       ))}
                     </div>
                   </td>
-                  <td className={`border-b px-3 py-3 ${darkMode ? 'border-zinc-850' : 'border-brand-border'}`}>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800' : 'border-zinc-250'}`}>
                     <select
                       defaultValue=""
                       onChange={(event) => {
@@ -2342,10 +2542,10 @@ function AdminStudents({
                         onAdminAddClass(student.id, event.target.value);
                         event.target.value = '';
                       }}
-                      className={`w-40 rounded-md border px-2 py-1.5 text-xs outline-none transition-colors ${
+                      className={`w-full max-w-[150px] rounded border px-2 py-1 text-xs outline-none transition-colors ${
                         darkMode
-                          ? 'bg-zinc-800 border-zinc-750 text-zinc-200 focus:border-brand'
-                          : 'bg-white border-brand-border text-brand-text'
+                          ? 'bg-zinc-850 border-zinc-700 text-zinc-300 focus:border-brand'
+                          : 'bg-white border-zinc-300 text-brand-text'
                       }`}
                     >
                       <option value="">강좌 추가</option>
@@ -2356,26 +2556,26 @@ function AdminStudents({
                       ))}
                     </select>
                   </td>
-                  <td className={`border-b px-3 py-3 ${darkMode ? 'border-zinc-850' : 'border-brand-border'}`}>
-                    <div className="flex items-center gap-2">
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800' : 'border-zinc-250'}`}>
+                    <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => onGrantStudentOpening(student.id)}
-                        className={`rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors ${
+                        className={`rounded border px-2 py-1 text-[10px] font-semibold transition-colors shrink-0 ${
                           darkMode
-                            ? 'border-zinc-750 text-zinc-300 hover:bg-zinc-800 hover:text-white'
-                            : 'border-brand-border text-brand-text hover:bg-brand-bg'
+                            ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-850 hover:text-white'
+                            : 'border-zinc-300 text-brand-text bg-white hover:bg-brand-bg'
                         }`}
                       >
                         신규 입소생 오픈
                       </button>
-                      {opening ? <span className={`text-[10px] ${darkMode ? 'text-zinc-500' : 'text-brand-text-muted'}`}>오픈됨</span> : null}
+                      {opening ? <span className={`text-[10px] font-semibold shrink-0 text-brand ${darkMode ? 'text-brand' : 'text-brand'}`}>오픈됨</span> : null}
                       <button
                         onClick={() => {
                           if (confirm(`학생 '${student.name}'을(를) 정말 삭제하시겠습니까?\n해당 학생의 모든 수강 신청 기록도 함께 삭제됩니다.`)) {
                             onAdminDeleteStudents([student.id]);
                           }
                         }}
-                        className="text-red-500 hover:text-red-700 hover:underline text-[11px] font-semibold ml-2 transition-colors"
+                        className="text-red-500 hover:text-red-700 text-[10px] font-semibold shrink-0 ml-1.5 transition-colors"
                       >
                         삭제
                       </button>
@@ -2387,7 +2587,7 @@ function AdminStudents({
           </tbody>
         </table>
         {filtered.length === 0 ? (
-          <p className={`px-3 py-8 text-center text-sm ${darkMode ? 'text-zinc-550' : 'text-brand-text-muted'}`}>검색 결과가 없습니다.</p>
+          <p className={`border border-t-0 px-3 py-8 text-center text-sm ${darkMode ? 'border-zinc-800 text-zinc-550' : 'border-brand-border text-brand-text-muted'}`}>검색 결과가 없습니다.</p>
         ) : null}
       </div>
       {showAddModal && (
@@ -2407,15 +2607,22 @@ function AdminStudents({
 function AdminCourses({
   state,
   darkMode = false,
+  onImportCourses,
 }: {
   state: PrototypeState;
   darkMode?: boolean;
+  onImportCourses: (rows: Record<string, string>[]) => void;
 }) {
   const [query, setQuery] = React.useState('');
+  const [selectedSeason, setSelectedSeason] = React.useState<string | '전체'>(state.currentSeason);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
   const filtered = state.courses.filter((c) => {
+    const matchesSeason = selectedSeason === '전체' || c.seasonId === selectedSeason || (!c.seasonId && selectedSeason === 'season-3');
     const q = query.toLowerCase();
-    return `${c.code} ${c.subject} ${c.title} ${c.instructor}`.toLowerCase().includes(q);
+    const matchesQuery = `${c.code} ${c.subject} ${c.title} ${c.instructor}`.toLowerCase().includes(q);
+    return matchesSeason && matchesQuery;
   });
 
   function studentsInCourse(courseId: string) {
@@ -2423,15 +2630,42 @@ function AdminCourses({
     return regs.map((r) => state.students.find((s) => s.id === r.studentId)).filter(Boolean) as PrototypeStudent[];
   }
 
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const rows = await parseExcelFile(file);
+    onImportCourses(rows);
+    if (fileRef.current) fileRef.current.value = '';
+  }
+
   return (
     <Panel title="강좌 목록" darkMode={darkMode}>
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex gap-2 flex-wrap items-center">
+        <div className="flex items-center gap-1.5 mr-2">
+          <span className={`text-xs font-semibold ${darkMode ? 'text-zinc-400' : 'text-brand-text-muted'}`}>시즌 필터:</span>
+          <select
+            value={selectedSeason}
+            onChange={(e) => setSelectedSeason(e.target.value)}
+            className={`rounded-md border px-2 py-1.5 text-xs outline-none transition-colors focus:border-brand ${
+              darkMode
+                ? 'bg-zinc-800 border-zinc-700 text-zinc-200'
+                : 'bg-white border-brand-border text-brand-text'
+            }`}
+          >
+            <option value="전체">전체 시즌</option>
+            {state.seasonTemplates.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="코드, 과목, 강좌명, 강사 검색"
-          className={`flex-1 rounded-md border px-3 py-2 text-sm outline-none transition-colors focus:border-brand ${
+          className={`flex-1 min-w-[200px] rounded-md border px-3 py-2 text-sm outline-none transition-colors focus:border-brand ${
             darkMode
               ? 'bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-500'
               : 'bg-white border-brand-border text-brand-text placeholder-brand-text-faint'
@@ -2457,16 +2691,28 @@ function AdminCourses({
         >
           Excel 내보내기
         </button>
+        <label htmlFor="course-excel-upload" className={`cursor-pointer rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
+          darkMode
+            ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-850 bg-zinc-800 hover:text-white'
+            : 'border-brand-border text-brand-text hover:bg-brand-bg'
+        }`}>
+          Excel 가져오기
+          <input id="course-excel-upload" ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" />
+        </label>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[700px] text-sm">
-          <thead className={darkMode ? 'bg-zinc-800/80 text-zinc-200' : 'bg-brand-bg'}>
+        <table className="w-full min-w-[750px] border-collapse border border-zinc-300 dark:border-zinc-700 text-sm">
+          <thead className={darkMode ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100/90 text-zinc-700'}>
             <tr>
-              {['', '코드', '과목', '강좌명', '강사', '정원'].map((header) => (
+              <th className={`border border-zinc-300 dark:border-zinc-700 w-8 select-none ${darkMode ? 'border-zinc-700' : ''}`} />
+              <th className={`border border-zinc-300 dark:border-zinc-700 text-center font-mono text-[10px] w-8 select-none text-zinc-400 dark:text-zinc-500 ${darkMode ? 'border-zinc-700 bg-zinc-800/30' : 'bg-zinc-50'}`}>
+                A
+              </th>
+              {['코드 (B)', '과목 (C)', '강좌명 (D)', '강사 (E)', '학점 (F)', '정원 (G)', '시즌 (H)'].map((header) => (
                 <th
                   key={header}
-                  className={`border-b px-3 py-2 text-left font-semibold ${
-                    darkMode ? 'border-zinc-800 text-zinc-300' : 'border-brand-border'
+                  className={`border border-zinc-300 dark:border-zinc-700 px-2 py-1.5 text-left font-semibold text-xs ${
+                    darkMode ? 'border-zinc-700 text-zinc-300' : 'border-zinc-300 text-zinc-700'
                   }`}
                 >
                   {header}
@@ -2475,7 +2721,7 @@ function AdminCourses({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((course) => {
+            {filtered.map((course, idx) => {
               const enrolled = studentsInCourse(course.id);
               const isExpanded = expandedId === course.id;
               const pct = Math.round((course.enrolled / Math.max(course.capacity, 1)) * 100);
@@ -2483,25 +2729,32 @@ function AdminCourses({
                 <React.Fragment key={course.id}>
                   <tr
                     className={`cursor-pointer transition-colors ${
-                      darkMode ? 'hover:bg-zinc-850/50' : 'hover:bg-brand-bg/40'
+                      darkMode ? 'hover:bg-zinc-850/50' : 'hover:bg-zinc-50'
                     }`}
                     onClick={() => setExpandedId(isExpanded ? null : course.id)}
                   >
-                    <td className={`border-b px-3 py-3 text-xs ${darkMode ? 'border-zinc-850 text-zinc-500' : 'border-brand-border text-brand-text-faint'}`}>
+                    <td className={`border border-zinc-250 dark:border-zinc-750 px-2 py-1.5 text-center text-xs text-zinc-400 select-none ${darkMode ? 'border-zinc-800' : ''}`}>
                       {isExpanded ? '▼' : '▶'}
                     </td>
-                    <td className={`border-b px-3 py-3 text-xs ${darkMode ? 'border-zinc-850 text-zinc-400' : 'border-brand-border text-brand-text-faint'}`}>{course.code}</td>
-                    <td className={`border-b px-3 py-3 text-xs ${darkMode ? 'border-zinc-850 text-zinc-400' : 'border-brand-border text-brand-text-faint'}`}>{course.subject}</td>
-                    <td className={`border-b px-3 py-3 font-semibold ${darkMode ? 'border-zinc-850 text-zinc-200' : 'border-brand-border'}`}>{course.title}</td>
-                    <td className={`border-b px-3 py-3 text-xs ${darkMode ? 'border-zinc-850 text-zinc-300' : 'border-brand-border text-brand-text-muted'}`}>{course.instructor}</td>
-                    <td className={`border-b px-3 py-3 ${darkMode ? 'border-zinc-850 text-zinc-200' : 'border-brand-border'}`}>
-                      <span className="text-sm font-semibold">{course.enrolled}/{course.capacity}</span>
-                      <span className={`ml-1 text-xs ${darkMode ? 'text-zinc-500' : 'text-brand-text-faint'}`}>({pct}%)</span>
+                    <td className={`border border-zinc-250 dark:border-zinc-750 text-center font-mono text-[10px] text-zinc-400 dark:text-zinc-500 select-none ${darkMode ? 'border-zinc-800 bg-zinc-800/30' : 'bg-zinc-50'}`}>
+                      {idx + 1}
+                    </td>
+                    <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs font-mono font-semibold ${darkMode ? 'border-zinc-800 text-zinc-450' : 'border-zinc-250 text-brand'}`}>{course.code}</td>
+                    <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800 text-zinc-400' : 'border-zinc-250 text-brand-text-muted'}`}>{course.subject}</td>
+                    <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs font-semibold ${darkMode ? 'border-zinc-800 text-zinc-200' : 'border-zinc-250 text-brand-text'}`}>{course.title}</td>
+                    <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800 text-zinc-300' : 'border-zinc-250 text-brand-text-muted'}`}>{course.instructor}</td>
+                    <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs font-mono text-center ${darkMode ? 'border-zinc-800 text-zinc-350' : 'border-zinc-250 text-brand-text-muted'}`}>{course.credits}학점</td>
+                    <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800 text-zinc-200' : 'border-zinc-250 text-brand-text'}`}>
+                      <span className="font-semibold">{course.enrolled}/{course.capacity}</span>
+                      <span className={`ml-1 text-[10px] ${darkMode ? 'text-zinc-500' : 'text-brand-text-faint'}`}>({pct}%)</span>
+                    </td>
+                    <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800 text-zinc-300' : 'border-zinc-250 text-brand-text-muted'}`}>
+                      {state.seasonTemplates.find((s) => s.id === course.seasonId)?.name.split(' ')[0] || course.seasonId || '시즌 3'}
                     </td>
                   </tr>
                   {isExpanded ? (
-                    <tr className={darkMode ? 'bg-zinc-950/30' : 'bg-brand-bg/40'}>
-                      <td colSpan={6} className={`border-b px-6 py-3 ${darkMode ? 'border-zinc-850' : 'border-brand-border'}`}>
+                    <tr className={darkMode ? 'bg-zinc-950/20' : 'bg-zinc-50/50'}>
+                      <td colSpan={9} className={`border border-zinc-250 dark:border-zinc-750 px-6 py-3 ${darkMode ? 'border-zinc-800' : 'border-zinc-250'}`}>
                         <p className={`mb-2 text-xs font-semibold ${darkMode ? 'text-zinc-400' : 'text-brand-text-muted'}`}>
                           수강 학생 ({enrolled.length}명)
                         </p>
@@ -2511,7 +2764,7 @@ function AdminCourses({
                           <div className="flex flex-wrap gap-1.5">
                             {enrolled.map((s) => (
                               <span key={s.id} className={`rounded-full border px-2 py-0.5 text-[11px] ${
-                                darkMode ? 'bg-zinc-800 border-zinc-700 text-zinc-300' : 'bg-white border-brand-border text-brand-text'
+                                darkMode ? 'bg-zinc-850 border-zinc-750 text-zinc-350' : 'bg-white border-brand-border text-brand-text'
                               }`}>
                                 {s.name} ({s.cohortId})
                               </span>
@@ -2527,7 +2780,7 @@ function AdminCourses({
           </tbody>
         </table>
         {filtered.length === 0 ? (
-          <p className={`px-3 py-8 text-center text-sm ${darkMode ? 'text-zinc-550' : 'text-brand-text-muted'}`}>검색 결과가 없습니다.</p>
+          <p className={`border border-t-0 px-3 py-8 text-center text-sm ${darkMode ? 'border-zinc-800 text-zinc-550' : 'border-brand-border text-brand-text-muted'}`}>검색 결과가 없습니다.</p>
         ) : null}
       </div>
     </Panel>
@@ -2629,14 +2882,17 @@ function AdminRegistrations({
         </button>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[700px] text-sm">
-          <thead className={darkMode ? 'bg-zinc-800/80 text-zinc-200' : 'bg-brand-bg'}>
+        <table className="w-full min-w-[750px] border-collapse border border-zinc-300 dark:border-zinc-700 text-sm">
+          <thead className={darkMode ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100/90 text-zinc-700'}>
             <tr>
-              {['반', '이름', '학교명', '신청 강좌', '개수', '상태'].map((header) => (
+              <th className={`border border-zinc-300 dark:border-zinc-700 text-center font-mono text-[10px] w-8 select-none text-zinc-400 dark:text-zinc-500 ${darkMode ? 'border-zinc-700 bg-zinc-800/30' : 'bg-zinc-50'}`}>
+                A
+              </th>
+              {['반 (B)', '이름 (C)', '학교명 (D)', '신청 강좌 (E)', '개수 (F)', '상태 (G)'].map((header) => (
                 <th
                   key={header}
-                  className={`border-b px-3 py-2 text-left font-semibold ${
-                    darkMode ? 'border-zinc-800 text-zinc-300' : 'border-brand-border'
+                  className={`border border-zinc-300 dark:border-zinc-700 px-2 py-1.5 text-left font-semibold text-xs ${
+                    darkMode ? 'border-zinc-700 text-zinc-300' : 'border-zinc-300 text-zinc-700'
                   }`}
                 >
                   {header}
@@ -2645,7 +2901,7 @@ function AdminRegistrations({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((student) => {
+            {filtered.map((student, idx) => {
               const courses = getStudentCourses(state, student.id);
               const count = courses.length;
               const pick = calculateClassPick(count);
@@ -2653,13 +2909,16 @@ function AdminRegistrations({
                 <tr
                   key={student.id}
                   className={`transition-colors ${
-                    darkMode ? 'hover:bg-zinc-800/20' : 'hover:bg-brand-bg/40'
+                    darkMode ? 'hover:bg-zinc-850/50' : 'hover:bg-zinc-50'
                   }`}
                 >
-                  <td className={`border-b px-3 py-3 text-xs ${darkMode ? 'border-zinc-850 text-zinc-400' : 'border-brand-border text-brand-text-faint'}`}>{student.cohortId}</td>
-                  <td className={`border-b px-3 py-3 font-semibold ${darkMode ? 'border-zinc-850 text-zinc-200' : 'border-brand-border'}`}>{student.name}</td>
-                  <td className={`border-b px-3 py-3 text-xs ${darkMode ? 'border-zinc-850 text-zinc-400' : 'border-brand-border text-brand-text-faint'}`}>{student.school}</td>
-                  <td className={`border-b px-3 py-3 ${darkMode ? 'border-zinc-850' : 'border-brand-border'}`}>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 text-center font-mono text-[10px] text-zinc-400 dark:text-zinc-500 select-none ${darkMode ? 'border-zinc-800 bg-zinc-800/30' : 'bg-zinc-50'}`}>
+                    {idx + 1}
+                  </td>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs font-mono font-semibold ${darkMode ? 'border-zinc-800 text-zinc-450' : 'border-zinc-250 text-zinc-500'}`}>{student.cohortId}</td>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs font-semibold ${darkMode ? 'border-zinc-800 text-zinc-200' : 'border-zinc-250 text-brand-text'}`}>{student.name}</td>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800 text-zinc-400' : 'border-zinc-250 text-brand-text-muted'}`}>{student.school}</td>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800' : 'border-zinc-250'}`}>
                     <div className="flex flex-wrap gap-1">
                       {courses.map((c) => (
                         <span key={c.id} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors ${
@@ -2670,11 +2929,11 @@ function AdminRegistrations({
                       ))}
                     </div>
                   </td>
-                  <td className={`border-b px-3 py-3 ${darkMode ? 'border-zinc-850' : 'border-brand-border'}`}>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs font-mono ${darkMode ? 'border-zinc-800' : 'border-zinc-250'}`}>
                     <span className={`text-sm font-semibold ${darkMode ? 'text-zinc-200' : 'text-brand-text'}`}>{count}개</span>
-                    <span className={`ml-1 text-xs ${darkMode ? 'text-zinc-500' : 'text-brand-text-faint'}`}>{pick}</span>
+                    <span className={`ml-1.5 text-xs ${darkMode ? 'text-zinc-550' : 'text-brand-text-faint'}`}>({pick})</span>
                   </td>
-                  <td className={`border-b px-3 py-3 ${darkMode ? 'border-zinc-850' : 'border-brand-border'}`}>
+                  <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800' : 'border-zinc-250'}`}>
                     <Pill color="teal" size="sm">신청 완료</Pill>
                   </td>
                 </tr>
@@ -2683,7 +2942,7 @@ function AdminRegistrations({
           </tbody>
         </table>
         {filtered.length === 0 ? (
-          <p className={`px-3 py-8 text-center text-sm ${darkMode ? 'text-zinc-550' : 'text-brand-text-muted'}`}>검색 결과가 없습니다.</p>
+          <p className={`border border-t-0 px-3 py-8 text-center text-sm ${darkMode ? 'border-zinc-800 text-zinc-550' : 'border-brand-border text-brand-text-muted'}`}>검색 결과가 없습니다.</p>
         ) : null}
       </div>
       </Panel>
@@ -2743,6 +3002,48 @@ function AdminDashboard({
   }
   instructorStats.sort((a, b) => b.enrolled - a.enrolled);
   const maxInstEnrolled = Math.max(...instructorStats.map((i) => i.enrolled), 1);
+
+  // Recharts Chart Data and Configs
+  const courseChartData = state.courses.map((c) => ({
+    name: c.title,
+    enrolled: c.enrolled,
+    capacity: c.capacity,
+    fill: c.enrolled >= c.capacity * 0.95 ? '#DC2626' : '#2DAE9D',
+  }));
+
+  const courseChartConfig = {
+    enrolled: {
+      label: "신청 인원",
+      color: "#2DAE9D",
+    },
+  } satisfies ChartConfig;
+
+  const subjectChartData = Object.entries(subjectCounts).map(([subject, counts]) => ({
+    name: subject,
+    enrolled: counts.enrolled,
+    capacity: counts.capacity,
+  }));
+
+  const subjectChartConfig = {
+    enrolled: {
+      label: "신청 인원",
+      color: "#3B82F6",
+    },
+  } satisfies ChartConfig;
+
+  const instructorChartData = instructorStats.map((inst) => ({
+    name: inst.name,
+    enrolled: inst.enrolled,
+    capacity: inst.capacity,
+    fill: inst.enrolled >= inst.capacity * 0.95 ? '#DC2626' : '#8B5CF6',
+  }));
+
+  const instructorChartConfig = {
+    enrolled: {
+      label: "신청 인원",
+      color: "#8B5CF6",
+    },
+  } satisfies ChartConfig;
 
   return (
     <div className="mt-6 space-y-5">
@@ -2820,79 +3121,110 @@ function AdminDashboard({
       </div>
 
       <div className="grid gap-5 lg:grid-cols-3">
-        <div className={`rounded-lg border p-5 transition-colors duration-200 ${darkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-brand-border text-brand-text'}`}>
-          <h3 className="mb-4 text-sm font-semibold">강좌별 신청 현황</h3>
-          <div className="space-y-3">
-            {state.courses.map((course) => {
-              const pct = Math.round((course.enrolled / Math.max(course.capacity, 1)) * 100);
-              const barWidth = Math.round((course.enrolled / maxEnrolled) * 100);
-              return (
-                <div key={course.id}>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="truncate font-medium">{course.title}</span>
-                    <span className={`ml-2 shrink-0 ${darkMode ? 'text-zinc-400' : 'text-brand-text-muted'}`}>{course.enrolled}/{course.capacity}</span>
-                  </div>
-                  <div className={`mt-1 h-2 w-full rounded-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-100'}`}>
-                    <div
-                      className="h-2 rounded-full transition-all"
-                      style={{
-                        width: `${barWidth}%`,
-                        backgroundColor: pct >= 95 ? '#DC2626' : '#2DAE9D',
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <Card darkMode={darkMode}>
+          <CardHeader>
+            <CardTitle>강좌별 신청 현황</CardTitle>
+            <CardDescription darkMode={darkMode}>각 강좌별 정원 대비 신청 비율</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[280px] w-full pr-4">
+            <ChartContainer config={courseChartConfig}>
+              <BarChart
+                data={courseChartData}
+                layout="vertical"
+                margin={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                barSize={12}
+              >
+                <XAxis type="number" hide />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  tickLine={false}
+                  axisLine={false}
+                  width={80}
+                  tickFormatter={(val) => (val.length > 7 ? `${val.slice(0, 6)}...` : val)}
+                  style={{ fontSize: '10px', fill: darkMode ? '#A1A1AA' : '#4B5563' }}
+                />
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent hideLabel={false} darkMode={darkMode} />}
+                />
+                <Bar dataKey="enrolled" radius={3}>
+                  {courseChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
 
-        <div className={`rounded-lg border p-5 transition-colors duration-200 ${darkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-brand-border text-brand-text'}`}>
-          <h3 className="mb-4 text-sm font-semibold">과목별 신청 분포</h3>
-          <div className="space-y-3">
-            {Object.entries(subjectCounts).map(([subject, counts]) => {
-              const pct = Math.round((counts.enrolled / Math.max(counts.capacity, 1)) * 100);
-              return (
-                <div key={subject}>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium">{subject}</span>
-                    <span className={darkMode ? 'text-zinc-400' : 'text-brand-text-muted'}>{counts.enrolled}/{counts.capacity} ({pct}%)</span>
-                  </div>
-                  <div className={`mt-1 h-2 w-full rounded-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-100'}`}>
-                    <div className="h-2 rounded-full bg-brand transition-all" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <Card darkMode={darkMode}>
+          <CardHeader>
+            <CardTitle>과목별 신청 분포</CardTitle>
+            <CardDescription darkMode={darkMode}>대과목 기준의 전체 과목 선택 통계</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[280px] w-full pr-4">
+            <ChartContainer config={subjectChartConfig}>
+              <BarChart
+                data={subjectChartData}
+                layout="vertical"
+                margin={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                barSize={14}
+              >
+                <XAxis type="number" hide />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  tickLine={false}
+                  axisLine={false}
+                  width={80}
+                  style={{ fontSize: '10px', fill: darkMode ? '#A1A1AA' : '#4B5563' }}
+                />
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent hideLabel={false} darkMode={darkMode} />}
+                />
+                <Bar dataKey="enrolled" fill="#3B82F6" radius={3} />
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
 
-        <div className={`rounded-lg border p-5 transition-colors duration-200 ${darkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-brand-border text-brand-text'}`}>
-          <h3 className="mb-4 text-sm font-semibold">선생님별 신청 현황</h3>
-          <div className="space-y-3">
-            {instructorStats.map((inst) => {
-              const pct = Math.round((inst.enrolled / Math.max(inst.capacity, 1)) * 100);
-              const barWidth = Math.round((inst.enrolled / maxInstEnrolled) * 100);
-              return (
-                <div key={inst.name}>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="truncate font-medium">{inst.name}</span>
-                    <span className={`ml-2 shrink-0 ${darkMode ? 'text-zinc-400' : 'text-brand-text-muted'}`}>{inst.enrolled}명 ({pct}%)</span>
-                  </div>
-                  <div className={`mt-1 h-2 w-full rounded-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-100'}`}>
-                    <div
-                      className="h-2 rounded-full transition-all"
-                      style={{
-                        width: `${barWidth}%`,
-                        backgroundColor: pct >= 95 ? '#DC2626' : '#2DAE9D',
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <Card darkMode={darkMode}>
+          <CardHeader>
+            <CardTitle>선생님별 신청 현황</CardTitle>
+            <CardDescription darkMode={darkMode}>담당 교사별 수강 신청 누적 인원</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[280px] w-full pr-4">
+            <ChartContainer config={instructorChartConfig}>
+              <BarChart
+                data={instructorChartData}
+                layout="vertical"
+                margin={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                barSize={12}
+              >
+                <XAxis type="number" hide />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  tickLine={false}
+                  axisLine={false}
+                  width={80}
+                  style={{ fontSize: '10px', fill: darkMode ? '#A1A1AA' : '#4B5563' }}
+                />
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent hideLabel={false} darkMode={darkMode} />}
+                />
+                <Bar dataKey="enrolled" radius={3}>
+                  {instructorChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

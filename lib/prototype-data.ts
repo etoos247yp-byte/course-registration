@@ -20,6 +20,7 @@ export type PrototypeStudent = {
 export type PrototypeCourse = {
   id: string;
   code: string;
+  seasonId: string;
   subject: PrototypeSubject;
   title: string;
   instructor: string;
@@ -147,6 +148,7 @@ const courses: PrototypeCourse[] = [
   {
     id: 'kor-basic',
     code: 'KOR-101',
+    seasonId: 'season-3',
     subject: '국어',
     title: '독서 기본기 회복',
     instructor: '정하늘',
@@ -160,6 +162,7 @@ const courses: PrototypeCourse[] = [
   {
     id: 'math-basic',
     code: 'MAT-201',
+    seasonId: 'season-3',
     subject: '수학',
     title: '수학 공통 개념 압축',
     instructor: '한도윤',
@@ -173,6 +176,7 @@ const courses: PrototypeCourse[] = [
   {
     id: 'eng-reading',
     code: 'ENG-110',
+    seasonId: 'season-3',
     subject: '영어',
     title: '영어 빈칸과 순서',
     instructor: '오유진',
@@ -186,6 +190,7 @@ const courses: PrototypeCourse[] = [
   {
     id: 'math-advanced',
     code: 'MAT-330',
+    seasonId: 'season-3',
     subject: '수학',
     title: '미적분 실전 N제',
     instructor: '강서준',
@@ -199,6 +204,7 @@ const courses: PrototypeCourse[] = [
   {
     id: 'science-life',
     code: 'SCI-210',
+    seasonId: 'season-3',
     subject: '과학탐구',
     title: '생명과학 도표 특강',
     instructor: '문채원',
@@ -212,6 +218,7 @@ const courses: PrototypeCourse[] = [
   {
     id: 'social-culture',
     code: 'SOC-120',
+    seasonId: 'season-3',
     subject: '사회탐구',
     title: '사회문화 자료 분석',
     instructor: '서지윤',
@@ -225,6 +232,7 @@ const courses: PrototypeCourse[] = [
   {
     id: 'kor-literature',
     code: 'KOR-240',
+    seasonId: 'season-3',
     subject: '국어',
     title: '문학 선지 감각',
     instructor: '백소은',
@@ -233,7 +241,7 @@ const courses: PrototypeCourse[] = [
     capacity: 26,
     enrolled: 16,
     meetings: [{ day: '금', block: 'B', time: '10:20-12:00' }],
-    summary: '작품 암기가 아니라 표현과 정서의 판단 기준을 세웁니다.',
+    summary: '작품 암기가 아니라 표현และ 정서의 판단 기준을 세웁니다.',
   },
 ];
 
@@ -323,7 +331,7 @@ export function hydratePrototypeState(savedState: PrototypeState): PrototypeStat
   const savedCoursesById = new Map(savedState.courses.map((course) => [course.id, course]));
   const courses = initial.courses.map((currentCourse) => {
     const savedCourse = savedCoursesById.get(currentCourse.id);
-    return savedCourse ? { ...savedCourse, subject: currentCourse.subject } : currentCourse;
+    return savedCourse ? { ...savedCourse, subject: currentCourse.subject, seasonId: savedCourse.seasonId || currentCourse.seasonId || 'season-3' } : currentCourse;
   });
 
   const registrationClose = savedState.registrationClose || calculateAutoCloseDate((savedState as Record<string, unknown>).startDate as string) || initial.registrationClose;
