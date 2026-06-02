@@ -383,7 +383,7 @@ export function PrototypeApp({ view }: { view: View }) {
 
   if (!session) {
     return (
-      <Shell session={session} onSignOut={signOut}>
+      <Shell session={session} onSignOut={signOut} isAdmin={isAdminView}>
         <section className="mx-auto flex max-w-xl flex-col items-center px-6 py-24 text-center">
           <ShieldCheck className="h-12 w-12 text-brand" />
           <h1 className="mt-6 text-2xl font-semibold">로그인이 필요합니다</h1>
@@ -398,7 +398,7 @@ export function PrototypeApp({ view }: { view: View }) {
 
   if (!canAccessPrototypeArea(session.role, isAdminView ? 'admin' : 'student')) {
     return (
-      <Shell session={session} onSignOut={signOut}>
+      <Shell session={session} onSignOut={signOut} isAdmin={isAdminView}>
         <section className="mx-auto flex max-w-xl flex-col items-center px-6 py-24 text-center">
           <Lock className="h-12 w-12 text-brand-danger" />
           <h1 className="mt-6 text-2xl font-semibold">접근할 수 없는 화면입니다</h1>
@@ -422,6 +422,7 @@ export function PrototypeApp({ view }: { view: View }) {
       onSignOut={signOut}
       darkMode={isAdminView && isAdminDarkMode}
       onToggleDarkMode={isAdminView ? () => setIsAdminDarkMode(!isAdminDarkMode) : undefined}
+      isAdmin={isAdminView}
     >
       {message ? (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 transition-all duration-300">
@@ -1197,19 +1198,33 @@ function Shell({
   onSignOut,
   darkMode = false,
   onToggleDarkMode,
+  isAdmin = false,
 }: {
   children: React.ReactNode;
   session: PrototypeSession | null;
   onSignOut: () => void;
   darkMode?: boolean;
   onToggleDarkMode?: () => void;
+  isAdmin?: boolean;
 }) {
   return (
-    <main className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-white text-brand-text'}`}>
-      <header className={`sticky top-0 z-10 border-b transition-colors duration-300 ${darkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white/95 border-brand-border backdrop-blur'}`}>
+    <main className={`min-h-screen transition-colors duration-300 ${isAdmin ? 'admin-theme' : ''} ${
+      darkMode 
+        ? 'bg-zinc-950 text-zinc-100' 
+        : isAdmin 
+        ? 'bg-[#fafafa] text-zinc-900' 
+        : 'bg-white text-brand-text'
+    }`}>
+      <header className={`sticky top-0 z-10 border-b transition-colors duration-300 ${
+        darkMode 
+          ? 'bg-zinc-950 border-zinc-850 text-zinc-100' 
+          : isAdmin 
+          ? 'bg-white border-zinc-200/80 text-zinc-900' 
+          : 'bg-white/95 border-brand-border backdrop-blur'
+      }`}>
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-          <Link href={session?.role === 'admin' || session?.role === 'super_admin' ? '/admin' : '/dashboard'} className="font-semibold text-brand">
-            ETOOS 247 수강신청
+          <Link href={session?.role === 'admin' || session?.role === 'super_admin' ? '/admin' : '/dashboard'} className={`font-semibold ${isAdmin ? 'text-zinc-900 dark:text-zinc-50' : 'text-brand'}`}>
+            ETOOS 247 수강신청 {session?.role === 'admin' || session?.role === 'super_admin' ? '관리자' : ''}
           </Link>
           <nav className="hidden items-center gap-1 text-sm md:flex">
             {session?.role === 'student' ? (
@@ -1219,16 +1234,16 @@ function Shell({
               </>
             ) : null}
             {session?.role === 'admin' || session?.role === 'super_admin' ? (
-              <Nav href="/admin" label="관리자" darkMode={darkMode} />
+              <Nav href="/admin" label="관리자 콘솔" darkMode={darkMode} isAdmin={isAdmin} />
             ) : null}
           </nav>
           <div className="flex items-center gap-3">
-            {session ? <span className={`hidden text-sm sm:inline ${darkMode ? 'text-zinc-400' : 'text-brand-text-muted'}`}>{session.name}</span> : null}
+            {session ? <span className={`hidden text-sm sm:inline ${darkMode ? 'text-zinc-400' : isAdmin ? 'text-zinc-500' : 'text-brand-text-muted'}`}>{session.name}</span> : null}
             {onToggleDarkMode ? (
               <button
                 onClick={onToggleDarkMode}
                 className={`p-2 rounded-md border transition-colors ${
-                  darkMode ? 'bg-zinc-800 border-zinc-700 text-yellow-400 hover:bg-zinc-700' : 'bg-white border-brand-border text-zinc-600 hover:bg-gray-50'
+                  darkMode ? 'bg-zinc-900 border-zinc-800 text-yellow-400 hover:bg-zinc-800' : isAdmin ? 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50' : 'bg-white border-brand-border text-zinc-600 hover:bg-gray-50'
                 }`}
                 title={darkMode ? '라이트 모드' : '다크 모드'}
               >
@@ -1236,7 +1251,7 @@ function Shell({
               </button>
             ) : null}
             {session ? (
-              <button onClick={onSignOut} className={`inline-flex items-center gap-1 rounded-md border px-3 py-2 text-sm transition-colors ${darkMode ? 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-zinc-100' : 'border-brand-border hover:bg-gray-50 text-brand-text'}`}>
+              <button onClick={onSignOut} className={`inline-flex items-center gap-1 rounded-md border px-3 py-2 text-sm transition-colors ${darkMode ? 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-100' : isAdmin ? 'bg-white border-zinc-200 hover:bg-zinc-50 text-zinc-900' : 'border-brand-border hover:bg-gray-50 text-brand-text'}`}>
                 <LogOut className="h-4 w-4" />
                 로그아웃
               </button>
@@ -1249,9 +1264,15 @@ function Shell({
   );
 }
 
-function Nav({ href, label, darkMode }: { href: string; label: string; darkMode?: boolean }) {
+function Nav({ href, label, darkMode, isAdmin = false }: { href: string; label: string; darkMode?: boolean; isAdmin?: boolean }) {
   return (
-    <Link href={href} className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${darkMode ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100' : 'text-brand-text-muted hover:bg-brand-bg hover:text-brand-text'}`}>
+    <Link href={href} className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+      darkMode 
+        ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100' 
+        : isAdmin 
+        ? 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900' 
+        : 'text-brand-text-muted hover:bg-brand-bg hover:text-brand-text'
+    }`}>
       {label}
     </Link>
   );
@@ -1991,7 +2012,9 @@ function AdminConsole({
 
   return (
     <Page title="관리자 콘솔" description="수강신청 운영을 위한 통합 제어판입니다." darkMode={darkMode}>
-      <div className="mb-5 flex flex-wrap gap-2">
+      <div className={`mb-5 p-1 rounded-lg flex items-center gap-1 border w-fit ${
+        darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-100/80 border-zinc-200/60'
+      }`}>
         <AdminTab href="/admin" label="요약" active={view === 'admin'} darkMode={darkMode} />
         <AdminTab href="/admin/students" label="학생" active={view === 'admin-students'} darkMode={darkMode} />
         <AdminTab href="/admin/courses" label="강좌" active={view === 'admin-courses'} darkMode={darkMode} />
@@ -2092,23 +2115,23 @@ function AdminConsole({
                     ? '수강신청이 잠겨 있어 학생의 신청/변경이 제한됩니다.'
                     : '수강신청이 열려 있어 학생이 자유롭게 신청/변경할 수 있습니다.'}
                 </p>
-                <div className={`flex overflow-hidden rounded-md border ${darkMode ? 'border-zinc-800' : 'border-brand-border'}`}>
+                 <div className={`flex overflow-hidden rounded-md border ${darkMode ? 'border-zinc-800' : 'border-zinc-200'}`}>
                   <button
                     onClick={() => { if (state.locked) onToggleLock(); }}
                     className="flex-1 px-4 py-2.5 text-sm font-semibold transition-colors"
                     style={{
-                      backgroundColor: !state.locked ? '#2DAE9D' : (darkMode ? '#1F2937' : '#FFFFFF'),
-                      color: !state.locked ? '#FFFFFF' : '#6B7280',
+                      backgroundColor: !state.locked ? (darkMode ? '#FAFAFA' : '#18181B') : (darkMode ? '#09090B' : '#FFFFFF'),
+                      color: !state.locked ? (darkMode ? '#18181B' : '#FFFFFF') : '#71717A',
                     }}
                   >
                     신청 가능
                   </button>
                   <button
                     onClick={() => { if (!state.locked) onToggleLock(); }}
-                    className={`flex-1 border-l px-4 py-2.5 text-sm font-semibold transition-colors ${darkMode ? 'border-zinc-800' : 'border-brand-border'}`}
+                    className={`flex-1 border-l px-4 py-2.5 text-sm font-semibold transition-colors ${darkMode ? 'border-zinc-800' : 'border-zinc-200'}`}
                     style={{
-                      backgroundColor: state.locked ? '#DC2626' : (darkMode ? '#1F2937' : '#FFFFFF'),
-                      color: state.locked ? '#FFFFFF' : '#6B7280',
+                      backgroundColor: state.locked ? '#DC2626' : (darkMode ? '#09090B' : '#FFFFFF'),
+                      color: state.locked ? '#FFFFFF' : '#71717A',
                     }}
                   >
                     신청 잠금
@@ -3284,7 +3307,7 @@ function AdminDashboard({
                   cursor={false}
                   content={<ChartTooltipContent hideLabel={false} darkMode={darkMode} />}
                 />
-                <Bar dataKey="enrolled" fill="#2DAE9D" radius={[6, 6, 6, 6]}>
+                <Bar dataKey="enrolled" fill="var(--color-brand)" radius={[6, 6, 6, 6]}>
                   <LabelList
                     dataKey="name"
                     position="insideLeft"
@@ -3327,9 +3350,9 @@ function AdminDashboard({
                 <PolarGrid stroke={darkMode ? '#3F3F46' : '#E5E7EB'} />
                 <Radar
                   dataKey="enrolled"
-                  fill="#2DAE9D"
+                  fill="var(--color-brand)"
                   fillOpacity={darkMode ? 0.4 : 0.6}
-                  stroke="#2DAE9D"
+                  stroke="var(--color-brand)"
                   strokeWidth={2}
                 />
               </RadarChart>
@@ -3365,7 +3388,7 @@ function AdminDashboard({
                   cursor={false}
                   content={<ChartTooltipContent hideLabel={false} darkMode={darkMode} />}
                 />
-                <Bar dataKey="enrolled" fill="#2DAE9D" radius={[6, 6, 6, 6]}>
+                <Bar dataKey="enrolled" fill="var(--color-brand)" radius={[6, 6, 6, 6]}>
                   <LabelList
                     dataKey="name"
                     position="insideLeft"
@@ -3847,12 +3870,14 @@ function AdminTab({
   return (
     <Link
       href={href}
-      className={`rounded-md border px-3 py-2 text-sm transition-colors duration-200 ${
+      className={`rounded-md px-3 py-1 text-sm font-medium transition-all duration-200 ${
         active
-          ? 'border-brand bg-brand text-white'
+          ? darkMode
+            ? 'bg-zinc-950 text-zinc-50 border border-zinc-800 shadow-sm'
+            : 'bg-white text-zinc-900 border border-zinc-200/80 shadow-sm'
           : darkMode
-          ? 'border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
-          : 'border-brand-border bg-white text-brand-text hover:bg-brand-bg'
+          ? 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40 rounded-md border border-transparent'
+          : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/40 rounded-md border border-transparent'
       }`}
     >
       {label}

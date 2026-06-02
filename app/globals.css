@@ -42,6 +42,65 @@
   100% { transform: scale(1); }
 }
 
+/* ui.shadcn.com Admin view styling overrides */
+.admin-theme {
+  --color-brand: #18181b; /* zinc-900 / black primary */
+  --color-brand-dark: #09090b; /* zinc-950 */
+  --color-brand-light: #f4f4f5; /* zinc-100 secondary */
+  --color-brand-bg: #fafafa; /* zinc-50 page canvas */
+  --color-brand-border: #e4e4e7; /* zinc-200 border */
+  --color-brand-text: #18181b; /* zinc-900 text */
+  --color-brand-text-muted: #71717a; /* zinc-500 */
+  --color-brand-text-faint: #a1a1aa; /* zinc-400 */
+}
+
+/* Admin dark mode style sheet (shadcn dark) */
+.dark.admin-theme, .admin-theme.dark, .admin-theme .dark {
+  --color-brand: #fafafa; /* zinc-50 / white primary */
+  --color-brand-dark: #ffffff; /* pure white */
+  --color-brand-light: #27272a; /* zinc-800 secondary */
+  --color-brand-bg: #09090b; /* zinc-950 page canvas */
+  --color-brand-border: #27272a; /* zinc-800 border */
+  --color-brand-text: #fafafa; /* zinc-50 text */
+  --color-brand-text-muted: #a1a1aa; /* zinc-400 */
+  --color-brand-text-faint: #71717a; /* zinc-500 */
+}
+
+/* Jspreadsheet overrides for shadcn style sheets */
+.admin-theme .jspreadsheet thead td {
+  background-color: #f4f4f5 !important;
+  color: #18181b !important;
+  border-bottom: 2px solid #e4e4e7 !important;
+  border-right: 1px solid #e4e4e7 !important;
+}
+.admin-theme .jspreadsheet tbody td {
+  border-bottom: 1px solid #e4e4e7 !important;
+  border-right: 1px solid #e4e4e7 !important;
+}
+.admin-theme .jspreadsheet tbody tr:hover td {
+  background-color: #fafafa !important;
+}
+
+/* Dark mode sheet overrides for shadcn */
+.dark.admin-theme .jspreadsheet-wrapper, .admin-theme.dark .jspreadsheet-wrapper {
+  background-color: #09090b !important;
+}
+.dark.admin-theme .jspreadsheet thead td, .admin-theme.dark .jspreadsheet thead td {
+  background-color: #18181b !important;
+  color: #fafafa !important;
+  border-bottom: 2px solid #27272a !important;
+  border-right: 1px solid #27272a !important;
+}
+.dark.admin-theme .jspreadsheet tbody td, .admin-theme.dark .jspreadsheet tbody td {
+  background-color: #09090b !important;
+  color: #fafafa !important;
+  border-bottom: 1px solid #27272a !important;
+  border-right: 1px solid #27272a !important;
+}
+.dark.admin-theme .jspreadsheet tbody tr:hover td, .admin-theme.dark .jspreadsheet tbody tr:hover td {
+  background-color: #18181b !important;
+}
+
 /* Jspreadsheet modern styling overrides */
 .jspreadsheet-wrapper {
   font-family: inherit;
