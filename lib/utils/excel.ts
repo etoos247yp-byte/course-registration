@@ -100,3 +100,41 @@ export async function parseExcelFile(file: File): Promise<Record<string, string>
   });
   return rows;
 }
+
+export function downloadStudentTemplate() {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('학생 업로드 양식');
+  ws.columns = [
+    { header: '반', key: 'cohortId', width: 16 },
+    { header: '이름', key: 'name', width: 12 },
+    { header: '학교명', key: 'school', width: 20 },
+    { header: '수준', key: 'level', width: 14 },
+  ];
+  ws.getRow(1).font = { bold: true };
+  
+  // Add sample rows for illustration
+  ws.addRow({ cohortId: '2027-final-6', name: '홍길동', school: '서울고등학교', level: '종합' });
+  ws.addRow({ cohortId: '2027-final-6', name: '성춘향', school: '부산고등학교', level: '수학' });
+  
+  downloadXlsx(wb, 'student_upload_template.xlsx');
+}
+
+export function downloadCourseTemplate() {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('강좌 업로드 양식');
+  ws.columns = [
+    { header: '과목', key: 'subject', width: 12 },
+    { header: '강좌명', key: 'title', width: 24 },
+    { header: '추천대상', key: 'level', width: 16 },
+    { header: '교재', key: 'textbook', width: 24 },
+    { header: '강사', key: 'instructor', width: 12 },
+  ];
+  ws.getRow(1).font = { bold: true };
+  
+  // Add sample rows for illustration
+  ws.addRow({ subject: '국어', title: '국어 독서 개념/기출', level: '3등급 이하', textbook: '[이투스] 독서 BLUE', instructor: '김독서' });
+  ws.addRow({ subject: '수학', title: '미적분 실전 N제', level: '1-2등급', textbook: '자체 프린트', instructor: '박수학' });
+  
+  downloadXlsx(wb, 'course_upload_template.xlsx');
+}
+

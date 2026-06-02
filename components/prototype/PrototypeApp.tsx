@@ -28,7 +28,7 @@ import { Bar, BarChart, XAxis, YAxis, Cell, PolarAngleAxis, PolarGrid, Radar, Ra
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { calculateAutoCloseDate } from '@/lib/utils/date-shorthand';
-import { exportStudents, exportCourses, exportRegistrations, parseExcelFile } from '@/lib/utils/excel';
+import { exportStudents, exportCourses, exportRegistrations, parseExcelFile, downloadStudentTemplate, downloadCourseTemplate } from '@/lib/utils/excel';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import {
   adminAddStudentClassAction,
@@ -976,10 +976,10 @@ export function PrototypeApp({ view }: { view: View }) {
               }
 
               const instructor = (r.강사 || r.강사명 || r.교사 || r.instructor || r.teacher || '미지정').trim();
-              const level = (r.수준 || r.대상 || r.level || r.target || '전체').trim();
+              const level = (r.추천대상 || r.수준 || r.대상 || r.level || r.target || '전체').trim();
               const credits = parseInt(r.학점 || r.시수 || r.credits || r.hours || '2') || 2;
               const capacity = parseInt(r.정원 || r.인원 || r.capacity || r.max_students || '30') || 30;
-              const summary = (r.요약 || r.설명 || r.summary || r.description || '').trim();
+              const summary = (r.교재 || r.요약 || r.설명 || r.summary || r.description || '').trim();
 
               // Extract season
               const seasonCol = (r.시즌 || r.시즌ID || r.season || r.seasonId || '').trim();
@@ -1038,7 +1038,10 @@ export function PrototypeApp({ view }: { view: View }) {
               const courseId = (r.id || r.courseId || `course-${code.toLowerCase()}`).trim();
 
               let course = existingCourses.find(
-                (c) => c.code.toLowerCase() === code.toLowerCase()
+                (c) =>
+                  c.code.toLowerCase() === code.toLowerCase() ||
+                  (c.title.toLowerCase() === title.toLowerCase() &&
+                    c.instructor.toLowerCase() === instructor.toLowerCase())
               );
 
               if (course) {
@@ -2546,6 +2549,16 @@ function AdminStudents({
         >
           Excel 내보내기
         </button>
+        <button
+          onClick={downloadStudentTemplate}
+          className={`rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
+            darkMode
+              ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-850 bg-zinc-800 hover:text-white'
+              : 'border-brand-border text-brand-text hover:bg-brand-bg'
+          }`}
+        >
+          양식 다운로드
+        </button>
         <label htmlFor="student-excel-upload" className={`cursor-pointer rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
           darkMode
             ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-850 bg-zinc-800 hover:text-white'
@@ -2818,6 +2831,16 @@ function AdminCourses({
           }`}
         >
           Excel 내보내기
+        </button>
+        <button
+          onClick={downloadCourseTemplate}
+          className={`rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
+            darkMode
+              ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-850 bg-zinc-800 hover:text-white'
+              : 'border-brand-border text-brand-text hover:bg-brand-bg'
+          }`}
+        >
+          양식 다운로드
         </button>
         <label htmlFor="course-excel-upload" className={`cursor-pointer rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
           darkMode
