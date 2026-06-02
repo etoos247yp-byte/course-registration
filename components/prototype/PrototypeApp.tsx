@@ -3105,20 +3105,6 @@ function AdminDashboard({
   }
   const maxPickCount = Math.max(...Object.values(pickCounts), 1);
 
-  const instructorStats: { name: string; enrolled: number; capacity: number }[] = [];
-  const instructorMap: Record<string, { enrolled: number; capacity: number }> = {};
-  for (const c of state.courses) {
-    if (!instructorMap[c.instructor]) instructorMap[c.instructor] = { enrolled: 0, capacity: 0 };
-    instructorMap[c.instructor].enrolled += c.enrolled;
-    instructorMap[c.instructor].capacity += c.capacity;
-  }
-  for (const [name, stats] of Object.entries(instructorMap)) {
-    instructorStats.push({ name, ...stats });
-  }
-  instructorStats.sort((a, b) => b.enrolled - a.enrolled);
-  const maxInstEnrolled = Math.max(...instructorStats.map((i) => i.enrolled), 1);
-
-  // Recharts Chart Data and Configs
   const getSubjectPriority = (subj: string) => {
     if (subj === '국어') return 1;
     if (subj === '수학') return 2;
@@ -3127,6 +3113,27 @@ function AdminDashboard({
     return 5;
   };
 
+  const instructorStats: { name: string; enrolled: number; capacity: number; subject: string }[] = [];
+  const instructorMap: Record<string, { enrolled: number; capacity: number; subject: string }> = {};
+  for (const c of state.courses) {
+    if (!instructorMap[c.instructor]) {
+      instructorMap[c.instructor] = { enrolled: 0, capacity: 0, subject: c.subject || '' };
+    }
+    instructorMap[c.instructor].enrolled += c.enrolled;
+    instructorMap[c.instructor].capacity += c.capacity;
+  }
+  for (const [name, stats] of Object.entries(instructorMap)) {
+    instructorStats.push({ name, ...stats });
+  }
+  const sortedInstructors = [...instructorStats].sort((a, b) => {
+    const pA = getSubjectPriority(a.subject || '');
+    const pB = getSubjectPriority(b.subject || '');
+    if (pA !== pB) return pA - pB;
+    return a.name.localeCompare(b.name, 'ko');
+  });
+  const maxInstEnrolled = Math.max(...instructorStats.map((i) => i.enrolled), 1);
+
+  // Recharts Chart Data and Configs
   const sortedCourses = [...state.courses].sort((a, b) => {
     const pA = getSubjectPriority(a.subject || '');
     const pB = getSubjectPriority(b.subject || '');
@@ -3161,10 +3168,11 @@ function AdminDashboard({
     },
   } satisfies ChartConfig;
 
-  const instructorChartData = instructorStats.map((inst) => ({
+  const instructorChartData = sortedInstructors.map((inst) => ({
     name: inst.name,
     enrolled: inst.enrolled,
     capacity: inst.capacity,
+    displayLabel: `${inst.enrolled}명`,
   }));
 
   const instructorChartConfig = {
@@ -3332,30 +3340,47 @@ function AdminDashboard({
         <Card darkMode={darkMode}>
           <CardHeader>
             <CardTitle>선생님별 신청 현황</CardTitle>
-            <CardDescription darkMode={darkMode}>담당 교사별 수강 신청 누적 인원</CardDescription>
+            <CardDescription darkMode={darkMode}>담당 교사별 현재 수강 신청 인원 (국수영탐 순)</CardDescription>
           </CardHeader>
           <CardContent className="h-[280px] w-full pr-4">
             <ChartContainer config={instructorChartConfig}>
               <BarChart
+                accessibilityLayer
                 data={instructorChartData}
                 layout="vertical"
-                margin={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                barSize={12}
+                margin={{ left: 4, right: 28, top: 10, bottom: 10 }}
+                barSize={26}
               >
-                <XAxis type="number" hide />
+                <CartesianGrid horizontal={false} stroke={darkMode ? '#27272A' : '#F3F4F6'} />
                 <YAxis
                   dataKey="name"
                   type="category"
                   tickLine={false}
+                  tickMargin={10}
                   axisLine={false}
-                  width={80}
-                  style={{ fontSize: '10px', fill: darkMode ? '#A1A1AA' : '#4B5563' }}
+                  hide
                 />
+                <XAxis type="number" hide domain={[0, 'dataMax + 1']} />
                 <ChartTooltip
                   cursor={false}
                   content={<ChartTooltipContent hideLabel={false} darkMode={darkMode} />}
                 />
-                <Bar dataKey="enrolled" fill="#2DAE9D" radius={3} />
+                <Bar dataKey="enrolled" fill="#2DAE9D" radius={[6, 6, 6, 6]}>
+                  <LabelList
+                    dataKey="name"
+                    position="insideLeft"
+                    offset={10}
+                    fill="#ffffff"
+                    style={{ fontSize: '11px', fontWeight: 600 }}
+                  />
+                  <LabelList
+                    dataKey="enrolled"
+                    position="right"
+                    offset={10}
+                    fill={darkMode ? '#F4F4F5' : '#18181B'}
+                    style={{ fontSize: '11px', fontWeight: 600 }}
+                  />
+                </Bar>
               </BarChart>
             </ChartContainer>
           </CardContent>
