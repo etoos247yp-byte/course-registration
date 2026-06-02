@@ -3436,16 +3436,16 @@ function Roadmap({
               <div
                 className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold font-mono"
                 style={{
-                  backgroundColor: isActive ? '#2DAE9D' : isPast ? (darkMode ? '#1E293B' : '#E8F5F3') : (darkMode ? '#27272A' : '#F3F4F6'),
-                  color: isActive ? '#FFFFFF' : isPast ? '#259387' : (darkMode ? '#71717A' : '#9CA3AF'),
-                  boxShadow: isActive ? '0 0 0 4px rgba(45, 174, 157, 0.15)' : 'none',
+                  backgroundColor: isActive ? 'var(--color-brand)' : isPast ? (darkMode ? '#1E293B' : 'var(--color-brand-light)') : (darkMode ? '#27272A' : '#F3F4F6'),
+                  color: isActive ? (darkMode ? '#18181B' : '#FFFFFF') : isPast ? 'var(--color-brand-text)' : (darkMode ? '#71717A' : '#9CA3AF'),
+                  boxShadow: isActive ? '0 0 0 4px var(--color-brand-light)' : 'none',
                 }}
               >
                 {isPast ? <Check className="h-3.5 w-3.5" /> : i + 1}
               </div>
               <p
                 className="mt-2 text-center text-xs font-semibold"
-                style={{ color: isActive ? '#259387' : isPast ? (darkMode ? '#A1A1AA' : '#6B7280') : (darkMode ? '#52525B' : '#9CA3AF') }}
+                style={{ color: isActive ? 'var(--color-brand-text)' : isPast ? (darkMode ? '#A1A1AA' : '#6B7280') : (darkMode ? '#52525B' : '#9CA3AF') }}
               >
                 {step.label}
               </p>
@@ -3456,7 +3456,7 @@ function Roadmap({
             {i < steps.length - 1 ? (
               <div
                 className="mx-1 mt-4 h-0.5 flex-1"
-                style={{ backgroundColor: isPast ? '#2DAE9D' : (darkMode ? '#27272A' : '#E5E7EB') }}
+                style={{ backgroundColor: isPast ? 'var(--color-brand)' : (darkMode ? '#27272A' : '#E5E7EB') }}
               />
             ) : null}
           </div>
