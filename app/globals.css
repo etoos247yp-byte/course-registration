@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "jspreadsheet-ce/dist/jspreadsheet.css";
+@import "jsuites/dist/jsuites.css";
 
 @theme {
   --color-brand: #2DAE9D;
@@ -39,3 +41,56 @@
   50%  { transform: scale(1.05); }
   100% { transform: scale(1); }
 }
+
+/* Jspreadsheet modern styling overrides */
+.jspreadsheet-wrapper {
+  font-family: inherit;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.jspreadsheet {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+.jspreadsheet thead td {
+  background-color: #f3f4f6 !important;
+  color: #374151 !important;
+  font-weight: 600 !important;
+  border-bottom: 2px solid #e5e7eb !important;
+  border-right: 1px solid #e5e7eb !important;
+  padding: 8px 10px !important;
+  text-align: center !important;
+  font-size: 11px !important;
+}
+.jspreadsheet tbody td {
+  border-bottom: 1px solid #e5e7eb !important;
+  border-right: 1px solid #e5e7eb !important;
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+  color: #1f2937 !important;
+}
+.jspreadsheet tbody tr:hover td {
+  background-color: #f9fafb !important;
+}
+
+/* Dark mode overrides */
+.dark .jspreadsheet-wrapper {
+  background-color: #18181b !important;
+}
+.dark .jspreadsheet thead td {
+  background-color: #27272a !important;
+  color: #e4e4e7 !important;
+  border-bottom: 2px solid #3f3f46 !important;
+  border-right: 1px solid #3f3f46 !important;
+}
+.dark .jspreadsheet tbody td {
+  background-color: #18181b !important;
+  color: #f4f4f5 !important;
+  border-bottom: 1px solid #27272a !important;
+  border-right: 1px solid #27272a !important;
+}
+.dark .jspreadsheet tbody tr:hover td {
+  background-color: #27272a !important;
+}
+
