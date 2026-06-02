@@ -2398,7 +2398,7 @@ function AdminStudents({
   const [query, setQuery] = React.useState('');
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [showAddModal, setShowAddModal] = React.useState(false);
-  const [viewMode, setViewMode] = React.useState<'excel' | 'table'>('excel');
+  const [viewMode, setViewMode] = React.useState<'excel' | 'table'>('table');
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   const filtered = state.students.filter((s) => {
@@ -2666,7 +2666,7 @@ function AdminCourses({
   const [query, setQuery] = React.useState('');
   const [selectedSeason, setSelectedSeason] = React.useState<string | '전체'>(state.currentSeason);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
-  const [viewMode, setViewMode] = React.useState<'excel' | 'table'>('excel');
+  const [viewMode, setViewMode] = React.useState<'excel' | 'table'>('table');
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   const filtered = state.courses.filter((c) => {
@@ -2899,7 +2899,7 @@ function AdminRegistrations({
   onRejectChangeRequest: (requestId: string) => void;
 }) {
   const [query, setQuery] = React.useState('');
-  const [viewMode, setViewMode] = React.useState<'excel' | 'table'>('excel');
+  const [viewMode, setViewMode] = React.useState<'excel' | 'table'>('table');
   const pendingRequests = state.changeRequests.filter((request) => request.status === 'pending');
   const registered = state.students.filter((s) =>
     state.registrations.some((r) => r.studentId === s.id && r.status === 'active'),
@@ -3886,6 +3886,10 @@ function StudentSheet({
     if (typeof window === 'undefined' || !containerRef.current) return;
     containerRef.current.innerHTML = '';
 
+    if (typeof window !== 'undefined') {
+      const jSuitesModule = require('jsuites');
+      (window as any).jSuites = jSuitesModule.default || jSuitesModule;
+    }
     const jexcel = require('jspreadsheet-ce');
     const sheetCreator = jexcel.default || jexcel;
 
@@ -3968,6 +3972,10 @@ function CourseSheet({
     if (typeof window === 'undefined' || !containerRef.current) return;
     containerRef.current.innerHTML = '';
 
+    if (typeof window !== 'undefined') {
+      const jSuitesModule = require('jsuites');
+      (window as any).jSuites = jSuitesModule.default || jSuitesModule;
+    }
     const jexcel = require('jspreadsheet-ce');
     const sheetCreator = jexcel.default || jexcel;
 
@@ -4057,6 +4065,10 @@ function RegistrationSheet({
     if (typeof window === 'undefined' || !containerRef.current) return;
     containerRef.current.innerHTML = '';
 
+    if (typeof window !== 'undefined') {
+      const jSuitesModule = require('jsuites');
+      (window as any).jSuites = jSuitesModule.default || jSuitesModule;
+    }
     const jexcel = require('jspreadsheet-ce');
     const sheetCreator = jexcel.default || jexcel;
 
