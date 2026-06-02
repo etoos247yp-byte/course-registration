@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Pill } from '@/components/ui/Pill';
 import { SmartDateInput } from '@/components/ui/SmartDateInput';
-import { Bar, BarChart, XAxis, YAxis, Cell, PolarAngleAxis, PolarGrid, Radar, RadarChart } from 'recharts';
+import { Bar, BarChart, XAxis, YAxis, Cell, PolarAngleAxis, PolarGrid, Radar, RadarChart, CartesianGrid, LabelList } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { calculateAutoCloseDate } from '@/lib/utils/date-shorthand';
@@ -3123,6 +3123,7 @@ function AdminDashboard({
     name: c.title,
     enrolled: c.enrolled,
     capacity: c.capacity,
+    displayLabel: `${c.enrolled}/${c.capacity}명`,
   }));
 
   const courseChartConfig = {
@@ -3240,26 +3241,42 @@ function AdminDashboard({
           <CardContent className="h-[280px] w-full pr-4">
             <ChartContainer config={courseChartConfig}>
               <BarChart
+                accessibilityLayer
                 data={courseChartData}
                 layout="vertical"
-                margin={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                barSize={12}
+                margin={{ left: 8, right: 36, top: 10, bottom: 10 }}
+                barSize={18}
               >
-                <XAxis type="number" hide />
+                <CartesianGrid horizontal={false} stroke={darkMode ? '#27272A' : '#E5E7EB'} />
                 <YAxis
                   dataKey="name"
                   type="category"
                   tickLine={false}
+                  tickMargin={10}
                   axisLine={false}
-                  width={80}
-                  tickFormatter={(val) => (val.length > 7 ? `${val.slice(0, 6)}...` : val)}
-                  style={{ fontSize: '10px', fill: darkMode ? '#A1A1AA' : '#4B5563' }}
+                  hide
                 />
+                <XAxis dataKey="enrolled" type="number" hide />
                 <ChartTooltip
                   cursor={false}
                   content={<ChartTooltipContent hideLabel={false} darkMode={darkMode} />}
                 />
-                <Bar dataKey="enrolled" fill="#2DAE9D" radius={3} />
+                <Bar dataKey="enrolled" fill="#2DAE9D" radius={4}>
+                  <LabelList
+                    dataKey="name"
+                    position="insideLeft"
+                    offset={8}
+                    fill="#ffffff"
+                    style={{ fontSize: '11px', fontWeight: 600 }}
+                  />
+                  <LabelList
+                    dataKey="displayLabel"
+                    position="right"
+                    offset={8}
+                    fill={darkMode ? '#E4E4E7' : '#27272A'}
+                    style={{ fontSize: '11px', fontWeight: 500 }}
+                  />
+                </Bar>
               </BarChart>
             </ChartContainer>
           </CardContent>
