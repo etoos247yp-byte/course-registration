@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Pill } from '@/components/ui/Pill';
 import { SmartDateInput } from '@/components/ui/SmartDateInput';
-import { Bar, BarChart, XAxis, YAxis, Cell } from 'recharts';
+import { Bar, BarChart, XAxis, YAxis, Cell, PolarAngleAxis, PolarGrid, Radar, RadarChart } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { calculateAutoCloseDate } from '@/lib/utils/date-shorthand';
@@ -3270,29 +3270,29 @@ function AdminDashboard({
             <CardTitle>과목별 신청 분포</CardTitle>
             <CardDescription darkMode={darkMode}>대과목 기준의 전체 과목 선택 통계</CardDescription>
           </CardHeader>
-          <CardContent className="h-[280px] w-full pr-4">
-            <ChartContainer config={subjectChartConfig}>
-              <BarChart
-                data={subjectChartData}
-                layout="vertical"
-                margin={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                barSize={14}
-              >
-                <XAxis type="number" hide />
-                <YAxis
-                  dataKey="name"
-                  type="category"
-                  tickLine={false}
-                  axisLine={false}
-                  width={80}
-                  style={{ fontSize: '10px', fill: darkMode ? '#A1A1AA' : '#4B5563' }}
-                />
+          <CardContent className="h-[280px] w-full flex items-center justify-center pb-2">
+            <ChartContainer
+              config={subjectChartConfig}
+              className="mx-auto w-full h-full max-h-[240px]"
+            >
+              <RadarChart data={subjectChartData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
                 <ChartTooltip
                   cursor={false}
                   content={<ChartTooltipContent hideLabel={false} darkMode={darkMode} />}
                 />
-                <Bar dataKey="enrolled" fill="#2DAE9D" radius={3} />
-              </BarChart>
+                <PolarAngleAxis
+                  dataKey="name"
+                  tick={{ fill: darkMode ? '#A1A1AA' : '#4B5563', fontSize: 10, fontWeight: 500 }}
+                />
+                <PolarGrid stroke={darkMode ? '#3F3F46' : '#E5E7EB'} />
+                <Radar
+                  dataKey="enrolled"
+                  fill="#2DAE9D"
+                  fillOpacity={darkMode ? 0.4 : 0.6}
+                  stroke="#2DAE9D"
+                  strokeWidth={2}
+                />
+              </RadarChart>
             </ChartContainer>
           </CardContent>
         </Card>
