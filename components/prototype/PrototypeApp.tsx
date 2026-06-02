@@ -3010,7 +3010,6 @@ function AdminDashboard({
     name: c.title,
     enrolled: c.enrolled,
     capacity: c.capacity,
-    fill: c.enrolled >= c.capacity * 0.95 ? '#DC2626' : '#2DAE9D',
   }));
 
   const courseChartConfig = {
@@ -3029,7 +3028,7 @@ function AdminDashboard({
   const subjectChartConfig = {
     enrolled: {
       label: "신청 인원",
-      color: "#3B82F6",
+      color: "#2DAE9D",
     },
   } satisfies ChartConfig;
 
@@ -3037,13 +3036,12 @@ function AdminDashboard({
     name: inst.name,
     enrolled: inst.enrolled,
     capacity: inst.capacity,
-    fill: inst.enrolled >= inst.capacity * 0.95 ? '#DC2626' : '#8B5CF6',
   }));
 
   const instructorChartConfig = {
     enrolled: {
       label: "신청 인원",
-      color: "#8B5CF6",
+      color: "#2DAE9D",
     },
   } satisfies ChartConfig;
 
@@ -3150,11 +3148,7 @@ function AdminDashboard({
                   cursor={false}
                   content={<ChartTooltipContent hideLabel={false} darkMode={darkMode} />}
                 />
-                <Bar dataKey="enrolled" radius={3}>
-                  {courseChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
+                <Bar dataKey="enrolled" fill="#2DAE9D" radius={3} />
               </BarChart>
             </ChartContainer>
           </CardContent>
@@ -3186,7 +3180,7 @@ function AdminDashboard({
                   cursor={false}
                   content={<ChartTooltipContent hideLabel={false} darkMode={darkMode} />}
                 />
-                <Bar dataKey="enrolled" fill="#3B82F6" radius={3} />
+                <Bar dataKey="enrolled" fill="#2DAE9D" radius={3} />
               </BarChart>
             </ChartContainer>
           </CardContent>
@@ -3218,11 +3212,7 @@ function AdminDashboard({
                   cursor={false}
                   content={<ChartTooltipContent hideLabel={false} darkMode={darkMode} />}
                 />
-                <Bar dataKey="enrolled" radius={3}>
-                  {instructorChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
+                <Bar dataKey="enrolled" fill="#2DAE9D" radius={3} />
               </BarChart>
             </ChartContainer>
           </CardContent>
