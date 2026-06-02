@@ -2465,34 +2465,9 @@ function AdminStudents({
           Excel 가져오기
           <input id="student-excel-upload" ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" />
         </label>
-        <div className="flex rounded-md border border-zinc-200 dark:border-zinc-700 p-0.5 bg-zinc-50 dark:bg-zinc-900 shrink-0 sm:ml-auto">
-          <button
-            onClick={() => setViewMode('excel')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-              viewMode === 'excel'
-                ? 'bg-white dark:bg-zinc-800 text-brand shadow-sm font-semibold'
-                : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
-            }`}
-          >
-            Excel 시트
-          </button>
-          <button
-            onClick={() => setViewMode('table')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-              viewMode === 'table'
-                ? 'bg-white dark:bg-zinc-800 text-brand shadow-sm font-semibold'
-                : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
-            }`}
-          >
-            일반 표
-          </button>
-        </div>
       </div>
-      {viewMode === 'excel' ? (
-        <StudentSheet students={filtered} darkMode={darkMode} onSave={onImportStudents} />
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] border-collapse border border-zinc-300 dark:border-zinc-700 text-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1000px] border-collapse border border-zinc-300 dark:border-zinc-700 text-sm">
             <thead className={darkMode ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100/90 text-zinc-700'}>
               <tr>
                 <th className={`border border-zinc-300 dark:border-zinc-700 w-8 select-none ${darkMode ? 'border-zinc-700' : ''}`}>
@@ -2639,7 +2614,6 @@ function AdminStudents({
             <p className={`border border-t-0 px-3 py-8 text-center text-sm ${darkMode ? 'border-zinc-800 text-zinc-550' : 'border-brand-border text-brand-text-muted'}`}>검색 결과가 없습니다.</p>
           ) : null}
         </div>
-      )}
       {showAddModal && (
         <AddStudentModal
           darkMode={darkMode}
@@ -2666,7 +2640,6 @@ function AdminCourses({
   const [query, setQuery] = React.useState('');
   const [selectedSeason, setSelectedSeason] = React.useState<string | '전체'>(state.currentSeason);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
-  const [viewMode, setViewMode] = React.useState<'excel' | 'table'>('table');
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   const filtered = state.courses.filter((c) => {
@@ -2750,33 +2723,8 @@ function AdminCourses({
           Excel 가져오기
           <input id="course-excel-upload" ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" />
         </label>
-        <div className="flex rounded-md border border-zinc-200 dark:border-zinc-700 p-0.5 bg-zinc-50 dark:bg-zinc-900 shrink-0 sm:ml-auto">
-          <button
-            onClick={() => setViewMode('excel')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-              viewMode === 'excel'
-                ? 'bg-white dark:bg-zinc-800 text-brand shadow-sm font-semibold'
-                : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
-            }`}
-          >
-            Excel 시트
-          </button>
-          <button
-            onClick={() => setViewMode('table')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-              viewMode === 'table'
-                ? 'bg-white dark:bg-zinc-800 text-brand shadow-sm font-semibold'
-                : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
-            }`}
-          >
-            일반 표
-          </button>
-        </div>
       </div>
-      {viewMode === 'excel' ? (
-        <CourseSheet courses={filtered} darkMode={darkMode} onSave={onImportCourses} />
-      ) : (
-        <div className="overflow-x-auto">
+      <div className="overflow-x-auto">
           <table className="w-full min-w-[750px] border-collapse border border-zinc-300 dark:border-zinc-700 text-sm">
             <thead className={darkMode ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100/90 text-zinc-700'}>
               <tr>
@@ -2882,7 +2830,6 @@ function AdminCourses({
             <p className={`border border-t-0 px-3 py-8 text-center text-sm ${darkMode ? 'border-zinc-800 text-zinc-550' : 'border-brand-border text-brand-text-muted'}`}>검색 결과가 없습니다.</p>
           ) : null}
         </div>
-      )}
     </Panel>
   );
 }
@@ -2899,7 +2846,6 @@ function AdminRegistrations({
   onRejectChangeRequest: (requestId: string) => void;
 }) {
   const [query, setQuery] = React.useState('');
-  const [viewMode, setViewMode] = React.useState<'excel' | 'table'>('table');
   const pendingRequests = state.changeRequests.filter((request) => request.status === 'pending');
   const registered = state.students.filter((s) =>
     state.registrations.some((r) => r.studentId === s.id && r.status === 'active'),
@@ -2981,33 +2927,8 @@ function AdminRegistrations({
         >
           Excel 내보내기
         </button>
-        <div className="flex rounded-md border border-zinc-200 dark:border-zinc-700 p-0.5 bg-zinc-50 dark:bg-zinc-900 shrink-0 sm:ml-auto">
-          <button
-            onClick={() => setViewMode('excel')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-              viewMode === 'excel'
-                ? 'bg-white dark:bg-zinc-800 text-brand shadow-sm font-semibold'
-                : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
-            }`}
-          >
-            Excel 시트
-          </button>
-          <button
-            onClick={() => setViewMode('table')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-              viewMode === 'table'
-                ? 'bg-white dark:bg-zinc-800 text-brand shadow-sm font-semibold'
-                : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
-            }`}
-          >
-            일반 표
-          </button>
-        </div>
       </div>
-      {viewMode === 'excel' ? (
-        <RegistrationSheet rows={exportRows} darkMode={darkMode} />
-      ) : (
-        <div className="overflow-x-auto">
+      <div className="overflow-x-auto">
           <table className="w-full min-w-[750px] border-collapse border border-zinc-300 dark:border-zinc-700 text-sm">
             <thead className={darkMode ? 'bg-zinc-800/80 text-zinc-200' : 'bg-zinc-100/90 text-zinc-700'}>
               <tr>
@@ -3071,7 +2992,6 @@ function AdminRegistrations({
             <p className={`border border-t-0 px-3 py-8 text-center text-sm ${darkMode ? 'border-zinc-800 text-zinc-550' : 'border-brand-border text-brand-text-muted'}`}>검색 결과가 없습니다.</p>
           ) : null}
         </div>
-      )}
       </Panel>
     </div>
   );
@@ -3870,245 +3790,4 @@ function AdminTab({
   );
 }
 
-function StudentSheet({
-  students,
-  darkMode,
-  onSave,
-}: {
-  students: PrototypeStudent[];
-  darkMode: boolean;
-  onSave: (updated: Record<string, string>[]) => void;
-}) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const sheetInstanceRef = React.useRef<any>(null);
 
-  React.useEffect(() => {
-    if (typeof window === 'undefined' || !containerRef.current) return;
-    containerRef.current.innerHTML = '';
-
-    if (typeof window !== 'undefined') {
-      const jSuitesModule = require('jsuites');
-      (window as any).jSuites = jSuitesModule.default || jSuitesModule;
-    }
-    const jexcel = require('jspreadsheet-ce');
-    const sheetCreator = jexcel.default || jexcel;
-
-    const data = students.map((s) => [
-      s.cohortId,
-      s.name,
-      s.school,
-      s.level,
-      s.target,
-    ]);
-
-    const sheet = sheetCreator(containerRef.current, {
-      data: data,
-      columns: [
-        { title: '반 (B)', width: 140, type: 'text' },
-        { title: '이름 (C)', width: 120, type: 'text' },
-        { title: '학교명 (D)', width: 160, type: 'text' },
-        { title: '수준 (E)', width: 130, type: 'text' },
-        { title: '목표 (F)', width: 220, type: 'text' },
-      ],
-      minDimensions: [5, Math.max(10, students.length)],
-      contextMenu: function() { return false; },
-      tableOverflow: true,
-      tableHeight: '400px',
-    });
-
-    sheetInstanceRef.current = sheet;
-
-    return () => {
-      if (sheetInstanceRef.current && typeof sheetInstanceRef.current.destroy === 'function') {
-        sheetInstanceRef.current.destroy();
-      }
-    };
-  }, [students]);
-
-  const handleSave = () => {
-    if (!sheetInstanceRef.current) return;
-    const rawData = sheetInstanceRef.current.getData();
-    const rows = rawData.map((row: any) => ({
-      반: String(row[0] || '').trim(),
-      이름: String(row[1] || '').trim(),
-      학교명: String(row[2] || '').trim(),
-      수준: String(row[3] || '').trim(),
-      목표: String(row[4] || '').trim(),
-    })).filter((r: any) => r.이름);
-    onSave(rows);
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-end">
-        <button
-          onClick={handleSave}
-          className="rounded-md bg-brand hover:bg-brand-dark text-white px-3.5 py-2 text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 shadow active:scale-[0.98]"
-        >
-          <Check className="h-3.5 w-3.5" />
-          Excel 변경사항 저장
-        </button>
-      </div>
-      <div className="w-full overflow-x-auto border border-zinc-250 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-950 p-2 shadow-inner">
-        <div ref={containerRef} className={darkMode ? 'dark' : ''} />
-      </div>
-    </div>
-  );
-}
-
-function CourseSheet({
-  courses,
-  darkMode,
-  onSave,
-}: {
-  courses: PrototypeCourse[];
-  darkMode: boolean;
-  onSave: (updated: Record<string, string>[]) => void;
-}) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const sheetInstanceRef = React.useRef<any>(null);
-
-  React.useEffect(() => {
-    if (typeof window === 'undefined' || !containerRef.current) return;
-    containerRef.current.innerHTML = '';
-
-    if (typeof window !== 'undefined') {
-      const jSuitesModule = require('jsuites');
-      (window as any).jSuites = jSuitesModule.default || jSuitesModule;
-    }
-    const jexcel = require('jspreadsheet-ce');
-    const sheetCreator = jexcel.default || jexcel;
-
-    const data = courses.map((c) => [
-      c.code,
-      c.subject,
-      c.title,
-      c.instructor,
-      c.credits,
-      c.capacity,
-      c.summary,
-      c.seasonId,
-    ]);
-
-    const sheet = sheetCreator(containerRef.current, {
-      data: data,
-      columns: [
-        { title: '코드 (B)', width: 110, type: 'text' },
-        { title: '과목 (C)', width: 100, type: 'text' },
-        { title: '강좌명 (D)', width: 180, type: 'text' },
-        { title: '강사 (E)', width: 100, type: 'text' },
-        { title: '시수 (F)', width: 80, type: 'numeric' },
-        { title: '정원 (G)', width: 80, type: 'numeric' },
-        { title: '요약 (H)', width: 220, type: 'text' },
-        { title: '시즌 (I)', width: 100, type: 'text' },
-      ],
-      minDimensions: [8, Math.max(10, courses.length)],
-      contextMenu: function() { return false; },
-      tableOverflow: true,
-      tableHeight: '400px',
-    });
-
-    sheetInstanceRef.current = sheet;
-
-    return () => {
-      if (sheetInstanceRef.current && typeof sheetInstanceRef.current.destroy === 'function') {
-        sheetInstanceRef.current.destroy();
-      }
-    };
-  }, [courses]);
-
-  const handleSave = () => {
-    if (!sheetInstanceRef.current) return;
-    const rawData = sheetInstanceRef.current.getData();
-    const rows = rawData.map((row: any) => ({
-      코드: String(row[0] || '').trim(),
-      과목: String(row[1] || '').trim(),
-      강좌명: String(row[2] || '').trim(),
-      강사: String(row[3] || '').trim(),
-      학점: String(row[4] || '').trim(),
-      정원: String(row[5] || '').trim(),
-      요약: String(row[6] || '').trim(),
-      시즌: String(row[7] || '').trim(),
-    })).filter((r: any) => r.강좌명 && r.코드);
-    onSave(rows);
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-end">
-        <button
-          onClick={handleSave}
-          className="rounded-md bg-brand hover:bg-brand-dark text-white px-3.5 py-2 text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 shadow active:scale-[0.98]"
-        >
-          <Check className="h-3.5 w-3.5" />
-          Excel 변경사항 저장
-        </button>
-      </div>
-      <div className="w-full overflow-x-auto border border-zinc-250 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-950 p-2 shadow-inner">
-        <div ref={containerRef} className={darkMode ? 'dark' : ''} />
-      </div>
-    </div>
-  );
-}
-
-function RegistrationSheet({
-  rows,
-  darkMode,
-}: {
-  rows: { cohortId: string; name: string; school: string; courses: string; count: number; pick: string }[];
-  darkMode: boolean;
-}) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const sheetInstanceRef = React.useRef<any>(null);
-
-  React.useEffect(() => {
-    if (typeof window === 'undefined' || !containerRef.current) return;
-    containerRef.current.innerHTML = '';
-
-    if (typeof window !== 'undefined') {
-      const jSuitesModule = require('jsuites');
-      (window as any).jSuites = jSuitesModule.default || jSuitesModule;
-    }
-    const jexcel = require('jspreadsheet-ce');
-    const sheetCreator = jexcel.default || jexcel;
-
-    const data = rows.map((r) => [
-      r.cohortId,
-      r.name,
-      r.school,
-      r.courses,
-      r.count,
-      r.pick,
-    ]);
-
-    const sheet = sheetCreator(containerRef.current, {
-      data: data,
-      columns: [
-        { title: '반 (B)', width: 110, type: 'text', readOnly: true },
-        { title: '이름 (C)', width: 100, type: 'text', readOnly: true },
-        { title: '학교명 (D)', width: 140, type: 'text', readOnly: true },
-        { title: '신청 강좌 (E)', width: 280, type: 'text', readOnly: true },
-        { title: '개수 (F)', width: 80, type: 'numeric', readOnly: true },
-        { title: '클래스픽 (G)', width: 100, type: 'text', readOnly: true },
-      ],
-      minDimensions: [6, Math.max(10, rows.length)],
-      contextMenu: function() { return false; },
-      tableOverflow: true,
-      tableHeight: '400px',
-    });
-
-    sheetInstanceRef.current = sheet;
-
-    return () => {
-      if (sheetInstanceRef.current && typeof sheetInstanceRef.current.destroy === 'function') {
-        sheetInstanceRef.current.destroy();
-      }
-    };
-  }, [rows]);
-
-  return (
-    <div className="w-full overflow-x-auto border border-zinc-250 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-950 p-2 shadow-inner">
-      <div ref={containerRef} className={darkMode ? 'dark' : ''} />
-    </div>
-  );
-}
