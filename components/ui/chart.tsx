@@ -30,7 +30,7 @@ export const ChartContainer = React.forwardRef<
 
   return (
     <ChartContext.Provider value={{ config }}>
-      <div ref={ref} className={`w-full ${className || ""}`} {...props}>
+      <div ref={ref} className={`w-full h-full ${className || ""}`} {...props}>
         <style dangerouslySetInnerHTML={{
           __html: `
             [data-chart="${chartId}"] {
@@ -87,16 +87,25 @@ export const ChartTooltipContent = React.forwardRef<
           const key = item.name || item.dataKey || "value";
           const configItem = config[key as string];
           const color = item.color || item.payload?.fill || configItem?.color;
+          const capacity = item.payload?.capacity;
 
           return (
-            <div key={index} className="flex items-center gap-1.5">
-              <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-              <span className={darkMode ? "text-zinc-400" : "text-zinc-500"}>
-                {configItem?.label || key}
-              </span>
-              <span className="font-semibold ml-auto">
-                {item.value}명
-              </span>
+            <div key={index} className="space-y-1">
+              <div className="flex items-center gap-1.5">
+                <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                <span className={darkMode ? "text-zinc-450" : "text-zinc-600"}>
+                  {configItem?.label || key}
+                </span>
+                <span className="font-semibold ml-auto">
+                  {item.value}명
+                </span>
+              </div>
+              {capacity !== undefined && (
+                <div className="flex items-center justify-between pl-3.5 text-[10px] text-zinc-400 font-medium">
+                  <span>정원: {capacity}명</span>
+                  <span>({Math.round((item.value / Math.max(capacity, 1)) * 100)}%)</span>
+                </div>
+              )}
             </div>
           );
         })}

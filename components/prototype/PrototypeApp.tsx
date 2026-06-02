@@ -2753,8 +2753,10 @@ function AdminCourses({
                     </td>
                   </tr>
                   {isExpanded ? (
-                    <tr className={darkMode ? 'bg-zinc-950/20' : 'bg-zinc-50/50'}>
-                      <td colSpan={9} className={`border border-zinc-250 dark:border-zinc-750 px-6 py-3 ${darkMode ? 'border-zinc-800' : 'border-zinc-250'}`}>
+                    <tr className={darkMode ? 'bg-zinc-950/10' : 'bg-zinc-50/20'}>
+                      <td className={`border border-zinc-250 dark:border-zinc-750 ${darkMode ? 'border-zinc-800 bg-zinc-900/30' : 'border-zinc-250 bg-zinc-50/50'}`} />
+                      <td className={`border border-zinc-250 dark:border-zinc-750 text-center font-mono text-[10px] select-none ${darkMode ? 'border-zinc-800 bg-zinc-900/30' : 'border-zinc-250 bg-zinc-50/50'}`} />
+                      <td colSpan={7} className={`border border-zinc-250 dark:border-zinc-750 px-6 py-3 text-left ${darkMode ? 'border-zinc-800 bg-zinc-900/10' : 'border-zinc-250 bg-white'}`}>
                         <p className={`mb-2 text-xs font-semibold ${darkMode ? 'text-zinc-400' : 'text-brand-text-muted'}`}>
                           수강 학생 ({enrolled.length}명)
                         </p>
