@@ -3244,10 +3244,10 @@ function AdminDashboard({
                 accessibilityLayer
                 data={courseChartData}
                 layout="vertical"
-                margin={{ left: 8, right: 36, top: 10, bottom: 10 }}
-                barSize={18}
+                margin={{ left: 4, right: 28, top: 10, bottom: 10 }}
+                barSize={26}
               >
-                <CartesianGrid horizontal={false} stroke={darkMode ? '#27272A' : '#E5E7EB'} />
+                <CartesianGrid horizontal={false} stroke={darkMode ? '#27272A' : '#F3F4F6'} />
                 <YAxis
                   dataKey="name"
                   type="category"
@@ -3256,25 +3256,25 @@ function AdminDashboard({
                   axisLine={false}
                   hide
                 />
-                <XAxis dataKey="enrolled" type="number" hide />
+                <XAxis type="number" hide domain={[0, 'dataMax + 1']} />
                 <ChartTooltip
                   cursor={false}
                   content={<ChartTooltipContent hideLabel={false} darkMode={darkMode} />}
                 />
-                <Bar dataKey="enrolled" fill="#2DAE9D" radius={4}>
+                <Bar dataKey="enrolled" fill="#2DAE9D" radius={[6, 6, 6, 6]}>
                   <LabelList
                     dataKey="name"
                     position="insideLeft"
-                    offset={8}
+                    offset={10}
                     fill="#ffffff"
                     style={{ fontSize: '11px', fontWeight: 600 }}
                   />
                   <LabelList
-                    dataKey="displayLabel"
+                    dataKey="enrolled"
                     position="right"
-                    offset={8}
-                    fill={darkMode ? '#E4E4E7' : '#27272A'}
-                    style={{ fontSize: '11px', fontWeight: 500 }}
+                    offset={10}
+                    fill={darkMode ? '#F4F4F5' : '#18181B'}
+                    style={{ fontSize: '11px', fontWeight: 600 }}
                   />
                 </Bar>
               </BarChart>
