@@ -2756,23 +2756,44 @@ function AdminCourses({
                     <tr className={darkMode ? 'bg-zinc-950/10' : 'bg-zinc-50/20'}>
                       <td className={`border border-zinc-250 dark:border-zinc-750 ${darkMode ? 'border-zinc-800 bg-zinc-900/30' : 'border-zinc-250 bg-zinc-50/50'}`} />
                       <td className={`border border-zinc-250 dark:border-zinc-750 text-center font-mono text-[10px] select-none ${darkMode ? 'border-zinc-800 bg-zinc-900/30' : 'border-zinc-250 bg-zinc-50/50'}`} />
-                      <td colSpan={7} className={`border border-zinc-250 dark:border-zinc-750 px-6 py-3 text-left ${darkMode ? 'border-zinc-800 bg-zinc-900/10' : 'border-zinc-250 bg-white'}`}>
-                        <p className={`mb-2 text-xs font-semibold ${darkMode ? 'text-zinc-400' : 'text-brand-text-muted'}`}>
-                          수강 학생 ({enrolled.length}명)
+                      <td colSpan={7} className={`border border-zinc-250 dark:border-zinc-750 px-6 py-4 text-left ${darkMode ? 'border-zinc-800 bg-zinc-900/10' : 'border-zinc-250 bg-white'}`}>
+                        <p className={`mb-3 text-xs font-semibold ${darkMode ? 'text-zinc-300' : 'text-brand-text-muted'}`}>
+                          수강 학생 분반 현황 (총 {enrolled.length}명)
                         </p>
                         {enrolled.length === 0 ? (
                           <p className={`text-xs ${darkMode ? 'text-zinc-500' : 'text-brand-text-muted'}`}>수강 학생 없음</p>
-                        ) : (
-                          <div className="flex flex-wrap gap-1.5">
-                            {enrolled.map((s) => (
-                              <span key={s.id} className={`rounded-full border px-2 py-0.5 text-[11px] ${
-                                darkMode ? 'bg-zinc-850 border-zinc-750 text-zinc-350' : 'bg-white border-brand-border text-brand-text'
-                              }`}>
-                                {s.name} ({s.cohortId})
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                        ) : (() => {
+                          const grouped: Record<string, PrototypeStudent[]> = {};
+                          for (const s of enrolled) {
+                            const cls = (s.cohortId || '기타').trim();
+                            if (!grouped[cls]) grouped[cls] = [];
+                            grouped[cls].push(s);
+                          }
+                          return (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                              {Object.entries(grouped).map(([cls, students]) => (
+                                <div key={cls} className={`border rounded overflow-hidden flex flex-col ${
+                                  darkMode ? 'border-zinc-800 bg-zinc-900/50' : 'border-zinc-200 bg-zinc-50/50'
+                                }`}>
+                                  <div className={`px-2 py-1 text-[11px] font-bold text-center border-b font-mono ${
+                                    darkMode ? 'border-zinc-800 bg-zinc-800/80 text-zinc-300' : 'border-zinc-200 bg-zinc-150 text-zinc-700'
+                                  }`}>
+                                    {cls} ({students.length}명)
+                                  </div>
+                                  <div className="p-1.5 space-y-1 flex-1">
+                                    {students.map((s) => (
+                                      <div key={s.id} className={`px-2 py-1 text-[11px] rounded border text-center font-medium ${
+                                        darkMode ? 'bg-zinc-850 border-zinc-750 text-zinc-350' : 'bg-white border-zinc-150 text-brand-text'
+                                      }`}>
+                                        {s.name}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ) : null}
