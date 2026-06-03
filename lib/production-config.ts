@@ -19,6 +19,13 @@ export function assertSupabaseConfigured(url: string | undefined, anonKey: strin
   if (url && anonKey) return;
 
   if (isProduction()) {
+    // During Next.js build or export phase, environment variables might not be provided.
+    // We allow the build to proceed to generate static pages (like /_not-found).
+    const isBuildPhase =
+      process.env.NEXT_PHASE === 'phase-production-build' ||
+      process.env.NEXT_PHASE === 'phase-export';
+    if (isBuildPhase) return;
+
     throw new Error('Supabase environment variables are required in production.');
   }
 }

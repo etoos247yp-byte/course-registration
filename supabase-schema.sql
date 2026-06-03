@@ -12,6 +12,9 @@ drop table if exists courses cascade;
 drop table if exists students cascade;
 drop table if exists system_settings cascade;
 drop table if exists admins cascade;
+drop table if exists course_submissions cascade;
+drop table if exists confirmed_class_picks cascade;
+drop table if exists change_requests cascade;
 
 -- 3. Create tables
 
@@ -72,6 +75,36 @@ create table admins (
   password text not null, -- bcrypt hash
   name text not null,
   role text not null check (role in ('admin', 'super_admin'))
+);
+
+-- Course submissions table (to track when student submissions are finalized)
+create table course_submissions (
+  student_id text references students(id) on delete cascade,
+  season_id text not null,
+  submitted_at timestamp with time zone not null default now(),
+  primary key (student_id, season_id)
+);
+
+-- Confirmed class picks table (to track student-confirmed class picks)
+create table confirmed_class_picks (
+  student_id text references students(id) on delete cascade,
+  season_id text not null,
+  class_pick text not null check (class_pick in ('Class A', 'Class B', 'Class C', 'Class D')),
+  confirmed_at timestamp with time zone not null default now(),
+  source text not null check (source in ('auto', 'manual')),
+  warning_acknowledged_at timestamp with time zone,
+  primary key (student_id, season_id)
+);
+
+-- Change requests table (for student-initiated course add/drop requests when locked)
+create table change_requests (
+  id text primary key,
+  student_id text references students(id) on delete cascade,
+  course_id text references courses(id) on delete cascade,
+  type text not null check (type in ('add', 'drop')),
+  status text not null check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamp with time zone not null default now(),
+  reviewed_at timestamp with time zone
 );
 
 -- 4. Create trigger to automatically update enrolled count in courses table
@@ -293,3 +326,6 @@ for each row execute function log_admin_modification();
 -- 9. Configure replica identities to FULL to enable realtime updates
 alter table courses replica identity full;
 alter table registrations replica identity full;
+alter table course_submissions replica identity full;
+alter table confirmed_class_picks replica identity full;
+alter table change_requests replica identity full;

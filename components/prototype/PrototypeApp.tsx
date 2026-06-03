@@ -227,11 +227,34 @@ export function PrototypeStateProvider({ children }: { children: React.ReactNode
     }
 
     try {
-      const { data: studentsData } = await supabase.from('students').select('*');
-      const { data: coursesData } = await supabase.from('courses').select('*').order('code');
-      const { data: registrationsData } = await supabase.from('registrations').select('*');
-      const { data: openingsData } = await supabase.from('individual_openings').select('*');
-      const { data: settingsData } = await supabase.from('system_settings').select('*');
+      const [
+        studentsRes,
+        coursesRes,
+        registrationsRes,
+        openingsRes,
+        settingsRes,
+        submissionsRes,
+        picksRes,
+        requestsRes,
+      ] = await Promise.all([
+        supabase.from('students').select('*'),
+        supabase.from('courses').select('*').order('code'),
+        supabase.from('registrations').select('*'),
+        supabase.from('individual_openings').select('*'),
+        supabase.from('system_settings').select('*'),
+        supabase.from('course_submissions').select('*'),
+        supabase.from('confirmed_class_picks').select('*'),
+        supabase.from('change_requests').select('*'),
+      ]);
+
+      const studentsData = studentsRes.data;
+      const coursesData = coursesRes.data;
+      const registrationsData = registrationsRes.data;
+      const openingsData = openingsRes.data;
+      const settingsData = settingsRes.data;
+      const submissionsData = submissionsRes.data || [];
+      const picksData = picksRes.data || [];
+      const requestsData = requestsRes.data || [];
 
       const lockedSetting = settingsData?.find((s) => s.key === 'locked')?.value ?? false;
       const seasonSetting = settingsData?.find((s) => s.key === 'currentSeason')?.value ?? 'season-3';
@@ -264,9 +287,28 @@ export function PrototypeStateProvider({ children }: { children: React.ReactNode
         currentSeason: seasonSetting,
         registrationClose: registrationCloseSetting,
         seasonTemplates,
-        confirmedClassPicks: [],
-        courseSubmissions: [],
-        changeRequests: [],
+        confirmedClassPicks: (picksData || []).map((p) => ({
+          studentId: p.student_id,
+          seasonId: p.season_id,
+          classPick: p.class_pick,
+          confirmedAt: p.confirmed_at,
+          source: p.source,
+          warningAcknowledgedAt: p.warning_acknowledged_at,
+        })),
+        courseSubmissions: (submissionsData || []).map((s) => ({
+          studentId: s.student_id,
+          seasonId: s.season_id,
+          submittedAt: s.submitted_at,
+        })),
+        changeRequests: (requestsData || []).map((r) => ({
+          id: r.id,
+          studentId: r.student_id,
+          courseId: r.course_id,
+          type: r.type,
+          status: r.status,
+          createdAt: r.created_at,
+          reviewedAt: r.reviewed_at,
+        })),
         individualOpenings: (openingsData || []).map((o) => ({
           studentId: o.student_id,
           open: o.open,
@@ -282,6 +324,7 @@ export function PrototypeStateProvider({ children }: { children: React.ReactNode
   React.useEffect(() => {
     let active = true;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadState().then(() => {
       if (!active) return;
 
@@ -438,25 +481,44 @@ function PrototypeAppInternal({ view }: { view: View }) {
     const nextState = autoConfirmStudentRegistration(state, activeStudentId);
     if (nextState === state) return;
 
-    const timer = window.setTimeout(() => {
+    const timer = window.setTimeout(async () => {
       if (!isSupabaseConfigured) {
         persistDemoState(nextState);
       } else {
-        setState(nextState);
+        const classPick = getEffectiveClassPick(state, activeStudentId);
+        await supabase
+          .from('confirmed_class_picks')
+          .upsert({
+            student_id: activeStudentId,
+            season_id: state.currentSeason,
+            class_pick: classPick,
+            confirmed_at: new Date().toISOString(),
+            source: 'auto',
+          });
+        await loadState();
       }
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [activeStudentId, hydrated, persistDemoState, session?.role, state]);
+  }, [activeStudentId, hydrated, persistDemoState, session?.role, state, loadState]);
 
-  function acknowledgeAutoConfirmNotice() {
+  async function acknowledgeAutoConfirmNotice() {
     const nextState = acknowledgeAutoConfirmation(state, activeStudentId);
     if (nextState === state) return;
 
     if (!isSupabaseConfigured) {
       persistDemoState(nextState);
     } else {
-      setState(nextState);
+      const { error } = await supabase
+        .from('confirmed_class_picks')
+        .update({ warning_acknowledged_at: new Date().toISOString() })
+        .eq('student_id', activeStudentId)
+        .eq('season_id', state.currentSeason);
+      if (error) {
+        setMessage(`확정 안내 확인 실패: ${error.message}`);
+      } else {
+        await loadState();
+      }
     }
   }
 
@@ -464,9 +526,27 @@ function PrototypeAppInternal({ view }: { view: View }) {
     if (hasLockedCourseSelection) {
       const result = submitChangeRequest(state, activeStudentId, 'drop', courseId, getVerifiedNow());
       if (result.ok) {
-        if (!isSupabaseConfigured) persistDemoState(result.state);
-        else setState(result.state);
-        setMessage('강의 변경 신청이 접수되었습니다. 관리자 승인 후 반영됩니다.');
+        if (!isSupabaseConfigured) {
+          persistDemoState(result.state);
+          setMessage('강의 변경 신청이 접수되었습니다. 관리자 승인 후 반영됩니다.');
+        } else {
+          const { error } = await supabase
+            .from('change_requests')
+            .insert({
+              id: result.requestId,
+              student_id: activeStudentId,
+              course_id: courseId,
+              type: 'drop',
+              status: 'pending',
+              created_at: new Date().toISOString(),
+            });
+          if (error) {
+            setMessage(`변경 신청 실패: ${error.message}`);
+          } else {
+            setMessage('강의 변경 신청이 접수되었습니다. 관리자 승인 후 반영됩니다.');
+            await loadState();
+          }
+        }
       } else {
         setMessage(result.reason);
       }
@@ -617,31 +697,77 @@ function PrototypeAppInternal({ view }: { view: View }) {
           isConfirmed={isStudentConfirmed}
           isSubmitted={isStudentSubmitted}
           onDrop={cancelCourse}
-          onCourseSubmit={() => {
+          onCourseSubmit={async () => {
             const nextState = submitStudentCourseSelection(state, activeStudentId);
             if (!isSupabaseConfigured) {
               persistDemoState(nextState);
+              setMessage('수강신청이 완료되었습니다. 이후 변경은 관리자 승인 후 반영됩니다.');
             } else {
-              setState(nextState);
+              const { error } = await supabase
+                .from('course_submissions')
+                .upsert({
+                  student_id: activeStudentId,
+                  season_id: state.currentSeason,
+                  submitted_at: new Date().toISOString(),
+                });
+              if (error) {
+                setMessage(`수강신청 제출 실패: ${error.message}`);
+              } else {
+                setMessage('수강신청이 완료되었습니다. 이후 변경은 관리자 승인 후 반영됩니다.');
+                await loadState();
+              }
             }
-            setMessage('수강신청이 완료되었습니다. 이후 변경은 관리자 승인 후 반영됩니다.');
           }}
-          onSubmit={() => {
+          onSubmit={async () => {
             const nextState = confirmStudentRegistration(state, activeStudentId);
             if (!isSupabaseConfigured) {
               persistDemoState(nextState);
+              setMessage('수강신청이 확정되었습니다.');
             } else {
-              setState(nextState);
+              const classPick = getEffectiveClassPick(state, activeStudentId);
+              const { error } = await supabase
+                .from('confirmed_class_picks')
+                .upsert({
+                  student_id: activeStudentId,
+                  season_id: state.currentSeason,
+                  class_pick: classPick,
+                  confirmed_at: new Date().toISOString(),
+                  source: 'manual',
+                  warning_acknowledged_at: new Date().toISOString(),
+                });
+              if (error) {
+                setMessage(`수강신청 확정 실패: ${error.message}`);
+              } else {
+                setMessage('수강신청이 확정되었습니다.');
+                await loadState();
+              }
             }
-            setMessage('수강신청이 확정되었습니다.');
           }}
           onAdd={async (courseId) => {
             if (hasLockedCourseSelection) {
               const requestResult = submitChangeRequest(state, activeStudentId, 'add', courseId, getVerifiedNow());
               if (requestResult.ok) {
-                if (!isSupabaseConfigured) persistDemoState(requestResult.state);
-                else setState(requestResult.state);
-                setMessage('강의 변경 신청이 접수되었습니다. 관리자 승인 후 반영됩니다.');
+                if (!isSupabaseConfigured) {
+                  persistDemoState(requestResult.state);
+                  setMessage('강의 변경 신청이 접수되었습니다. 관리자 승인 후 반영됩니다.');
+                } else {
+                  const { error } = await supabase
+                    .from('change_requests')
+                    .insert({
+                      id: requestResult.requestId,
+                      student_id: activeStudentId,
+                      course_id: courseId,
+                      type: 'add',
+                      status: 'pending',
+                      created_at: new Date().toISOString(),
+                    });
+                  if (error) {
+                    setMessage(`변경 신청 실패: ${error.message}`);
+                  } else {
+                    setMessage('강의 변경 신청이 접수되었습니다. 관리자 승인 후 반영됩니다.');
+                    await loadState();
+                  }
+                }
               } else {
                 setMessage(requestResult.reason);
               }
