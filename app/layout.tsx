@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { ToastProvider } from '@/components/ui/Toast';
+import { PrototypeStateProvider } from '@/components/prototype/PrototypeApp';
 
 export const metadata: Metadata = {
   title: 'ETOOS 247 이천기숙학원 수강신청',
@@ -17,7 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="bg-white font-sans text-brand-text antialiased">
-        <ToastProvider>{children}</ToastProvider>
+        <PrototypeStateProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </PrototypeStateProvider>
       </body>
     </html>
   );

@@ -128,14 +128,47 @@ function createEmptyPrototypeState(): PrototypeState {
   };
 }
 
-export function PrototypeApp({ view }: { view: View }) {
-  const router = useRouter();
+interface PrototypeContextProps {
+  state: PrototypeState;
+  setState: React.Dispatch<React.SetStateAction<PrototypeState>>;
+  session: PrototypeSession | null;
+  setSession: React.Dispatch<React.SetStateAction<PrototypeSession | null>>;
+  message: string;
+  setMessage: React.Dispatch<React.SetStateAction<string>>;
+  hydrated: boolean;
+  setHydrated: React.Dispatch<React.SetStateAction<boolean>>;
+  serverTimeMount: number | null;
+  perfTimeMount: number;
+  isAdminDarkMode: boolean;
+  setIsAdminDarkMode: React.Dispatch<React.SetStateAction<boolean>>;
+  persistDemoState: (nextState: PrototypeState) => void;
+  loadState: () => Promise<void>;
+  getVerifiedNow: () => Date;
+}
+
+const PrototypeContext = React.createContext<PrototypeContextProps | null>(null);
+
+export function usePrototype() {
+  const context = React.useContext(PrototypeContext);
+  if (!context) {
+    throw new Error('usePrototype must be used within a PrototypeStateProvider');
+  }
+  return context;
+}
+
+export function PrototypeStateProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<PrototypeState>(() => createInitialPrototypeState());
   const [session, setSession] = React.useState<PrototypeSession | null>(null);
   const [message, setMessage] = React.useState('');
   const [hydrated, setHydrated] = React.useState(false);
   const [serverTimeMount, setServerTimeMount] = React.useState<number | null>(null);
   const [perfTimeMount, setPerfTimeMount] = React.useState<number>(0);
+  const [isAdminDarkMode, setIsAdminDarkMode] = React.useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem('admin-dark-mode') === 'true';
+    }
+    return false;
+  });
 
   React.useEffect(() => {
     async function syncTime() {
@@ -154,13 +187,6 @@ export function PrototypeApp({ view }: { view: View }) {
     if (serverTimeMount === null) return new Date();
     return new Date(serverTimeMount + (performance.now() - perfTimeMount));
   }, [serverTimeMount, perfTimeMount]);
-
-  const [isAdminDarkMode, setIsAdminDarkMode] = React.useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return window.localStorage.getItem('admin-dark-mode') === 'true';
-    }
-    return false;
-  });
 
   React.useEffect(() => {
     window.localStorage.setItem('admin-dark-mode', String(isAdminDarkMode));
@@ -256,7 +282,6 @@ export function PrototypeApp({ view }: { view: View }) {
   React.useEffect(() => {
     let active = true;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Hydrates prototype state from localStorage or Supabase after mount.
     loadState().then(() => {
       if (!active) return;
 
@@ -290,6 +315,60 @@ export function PrototypeApp({ view }: { view: View }) {
     if (session) window.localStorage.setItem(sessionKey, JSON.stringify(session));
     else window.localStorage.removeItem(sessionKey);
   }, [hydrated, session]);
+
+  return (
+    <PrototypeContext.Provider
+      value={{
+        state,
+        setState,
+        session,
+        setSession,
+        message,
+        setMessage,
+        hydrated,
+        setHydrated,
+        serverTimeMount,
+        perfTimeMount,
+        isAdminDarkMode,
+        setIsAdminDarkMode,
+        persistDemoState,
+        loadState,
+        getVerifiedNow,
+      }}
+    >
+      {children}
+    </PrototypeContext.Provider>
+  );
+}
+
+export function PrototypeApp({ view }: { view: View }) {
+  const context = React.useContext(PrototypeContext);
+  if (context) {
+    return <PrototypeAppInternal view={view} />;
+  }
+  return (
+    <PrototypeStateProvider>
+      <PrototypeAppInternal view={view} />
+    </PrototypeStateProvider>
+  );
+}
+
+function PrototypeAppInternal({ view }: { view: View }) {
+  const router = useRouter();
+  const {
+    state,
+    setState,
+    session,
+    setSession,
+    message,
+    setMessage,
+    hydrated,
+    isAdminDarkMode,
+    setIsAdminDarkMode,
+    persistDemoState,
+    loadState,
+    getVerifiedNow,
+  } = usePrototype();
 
   async function signOut() {
     await logoutAction();
@@ -425,6 +504,15 @@ export function PrototypeApp({ view }: { view: View }) {
   }
 
   if (!session) {
+    if (!hydrated) {
+      return (
+        <div className="min-h-screen bg-white flex flex-col items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand border-t-transparent"></div>
+          <p className="mt-4 text-sm text-brand-text-muted">로딩 중...</p>
+        </div>
+      );
+    }
+
     return (
       <Shell session={session} onSignOut={signOut} isAdmin={isAdminView}>
         <section className="mx-auto flex max-w-xl flex-col items-center px-6 py-24 text-center">
