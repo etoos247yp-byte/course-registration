@@ -24,6 +24,7 @@ create table students (
   name text not null,
   dob text not null, -- Format: YYYY-MM-DD
   cohort_id text not null,
+  school text not null default '',
   level text not null,
   target text not null
 );
@@ -140,11 +141,11 @@ for each row execute function update_course_enrolled();
 -- 5. Seed initial data
 
 -- Seed students
-insert into students (id, name, dob, cohort_id, level, target) values
-('stu-1', '김민준', '2007-03-18', '2027-final-6', '종합 3등급', '국수영탐 균형 상승'),
-('stu-2', '이서연', '2007-05-22', '2027-final-6', '상위권', '수학 고난도 보강'),
-('stu-3', '박지호', '2007-08-04', '2027-final-6', '중위권', '개념 누수 점검'),
-('stu-4', '최예린', '2007-07-08', '2027-final-6', '최상위권', '실전 감각 유지');
+insert into students (id, name, dob, cohort_id, school, level, target) values
+('stu-1', '김민준', '2007-03-18', '2027-final-6', '이천고등학교', '종합 3등급', '국수영탐 균형 상승'),
+('stu-2', '이서연', '2007-05-22', '2027-final-6', '이천제일고', '상위권', '수학 고난도 보강'),
+('stu-3', '박지호', '2007-08-04', '2027-final-6', '이천양정여고', '중위권', '개념 누수 점검'),
+('stu-4', '최예린', '2007-07-08', '2027-final-6', '장호원고', '최상위권', '실전 감각 유지');
 
 -- Seed courses
 insert into courses (id, code, "seasonId", subject, title, instructor, level, credits, capacity, enrolled, meetings, summary, classroom, textbook) values
