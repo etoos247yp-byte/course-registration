@@ -1,7 +1,7 @@
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { calculateAutoCloseDate } from '@/lib/utils/date-shorthand';
 
-export type PrototypeRole = 'student' | 'admin' | 'super_admin';
+export type PrototypeRole = 'student' | 'admin' | 'super_admin' | 'teacher';
 export const prototypeSubjects = ['국어', '수학', '영어', '사회탐구', '과학탐구'] as const;
 export type PrototypeSubject = (typeof prototypeSubjects)[number];
 export type PrototypeDay = '월' | '화' | '수' | '목' | '금';
@@ -30,6 +30,8 @@ export type PrototypeCourse = {
   enrolled: number;
   meetings: { day: PrototypeDay; block: PrototypeBlock; time: string }[];
   summary: string;
+  classroom?: string;
+  textbook?: string;
 };
 
 export type PrototypeRegistration = {
@@ -47,7 +49,7 @@ export type ConfirmedClassPick = {
   seasonId: string;
   classPick: ClassPick;
   confirmedAt: string;
-  source?: 'manual' | 'auto';
+  source: 'auto' | 'manual';
   warningAcknowledgedAt?: string;
 };
 
@@ -75,13 +77,13 @@ export type IndividualOpening = {
 };
 
 export type PrototypeState = {
+  currentSeason: string;
+  registrationClose: string;
+  locked: boolean;
   students: PrototypeStudent[];
   courses: PrototypeCourse[];
   registrations: PrototypeRegistration[];
-  locked: boolean;
-  currentSeason: string;
-  registrationClose: string;
-  seasonTemplates: SeasonTemplate[];
+  seasonTemplates: { id: string; name: string; startDate: string; endDate: string; registrationClose: string }[];
   individualOpenings: IndividualOpening[];
   courseSubmissions: CourseSubmission[];
   confirmedClassPicks: ConfirmedClassPick[];
@@ -92,6 +94,7 @@ export type PrototypeSession = {
   role: PrototypeRole;
   id: string;
   name: string;
+  cohortId?: string;
 };
 
 export type PrototypeArea = 'student' | 'admin';
@@ -158,6 +161,8 @@ const courses: PrototypeCourse[] = [
     enrolled: 17,
     meetings: [{ day: '월', block: 'A', time: '08:20-10:00' }, { day: '수', block: 'A', time: '08:20-10:00' }],
     summary: '지문 구조 읽기와 선지 판단 루틴을 반복합니다.',
+    classroom: '301호 (3층)',
+    textbook: '독서 기본 패턴',
   },
   {
     id: 'math-basic',
@@ -172,6 +177,8 @@ const courses: PrototypeCourse[] = [
     enrolled: 19,
     meetings: [{ day: '월', block: 'B', time: '10:20-12:00' }, { day: '목', block: 'A', time: '08:20-10:00' }],
     summary: '수1, 수2의 빈출 개념을 문제 풀이 흐름으로 정리합니다.',
+    classroom: '302호 (3층)',
+    textbook: '수학 공통 압축 개념',
   },
   {
     id: 'eng-reading',
@@ -186,6 +193,8 @@ const courses: PrototypeCourse[] = [
     enrolled: 21,
     meetings: [{ day: '화', block: 'B', time: '10:20-12:00' }, { day: '목', block: 'B', time: '10:20-12:00' }],
     summary: '논리 연결어와 문장 기능을 기준으로 고난도 유형을 풉니다.',
+    classroom: '303호 (3층)',
+    textbook: '영어 독해 실전편',
   },
   {
     id: 'math-advanced',
@@ -200,6 +209,8 @@ const courses: PrototypeCourse[] = [
     enrolled: 14,
     meetings: [{ day: '화', block: 'C', time: '14:30-16:10' }, { day: '금', block: 'C', time: '14:30-16:10' }],
     summary: '준킬러와 킬러 문항의 발상 전환을 훈련합니다.',
+    classroom: '401호 (4층)',
+    textbook: '미적분 N제 200제',
   },
   {
     id: 'science-life',
@@ -214,6 +225,8 @@ const courses: PrototypeCourse[] = [
     enrolled: 25,
     meetings: [{ day: '수', block: 'D', time: '16:30-18:10' }],
     summary: '유전, 신경, 항상성 도표를 시간 안에 처리하는 강좌입니다.',
+    classroom: '402호 (4층)',
+    textbook: '생명과학 도표 비급',
   },
   {
     id: 'social-culture',
@@ -228,6 +241,8 @@ const courses: PrototypeCourse[] = [
     enrolled: 20,
     meetings: [{ day: '목', block: 'D', time: '16:30-18:10' }],
     summary: '표, 그래프, 개념 비교 문항을 빠르게 분류하고 풉니다.',
+    classroom: '501호 (5층)',
+    textbook: '사회문화 자료분석특강',
   },
   {
     id: 'kor-literature',
@@ -241,7 +256,9 @@ const courses: PrototypeCourse[] = [
     capacity: 26,
     enrolled: 16,
     meetings: [{ day: '금', block: 'B', time: '10:20-12:00' }],
-    summary: '작품 암기가 아니라 표현และ 정서의 판단 기준을 세웁니다.',
+    summary: '작품 암기가 아니라 표현과 정서의 판단 기준을 세웁니다.',
+    classroom: '502호 (5층)',
+    textbook: '문학 선지 개념서',
   },
 ];
 
@@ -358,12 +375,29 @@ export function hydratePrototypeState(savedState: PrototypeState): PrototypeStat
 
 export function authenticateDemoUser(identifier: string, secret: string): PrototypeSession | null {
   const trimmed = identifier.trim();
+
+  // Test shortcuts (1234 / 1234)
+  if (secret === '1234') {
+    if (trimmed === 'admin' || trimmed === '1234') {
+      return { role: 'admin', id: 'admin-1', name: '관리자' };
+    }
+    if (trimmed === 'teacher') {
+      return { role: 'teacher', id: 'teacher-1', name: '담임교사', cohortId: '2027-final-6' };
+    }
+    if (trimmed === 'student') {
+      return { role: 'student', id: 'stu-1', name: '김민준' };
+    }
+  }
+
   if (trimmed.includes('@')) {
     // Load admins from fixture and verify with bcrypt
     try {
       const adminsList = require('./fixtures/admins.json');
       const admin = adminsList.find((a: any) => a.email === trimmed);
       if (admin) {
+        if (admin.role === 'teacher') {
+          return { role: 'teacher', id: admin.id, name: admin.name, cohortId: admin.cohortId || '2027-final-6' };
+        }
         const bcrypt = require('bcryptjs');
         const match = bcrypt.compareSync(secret, admin.passwordHash);
         if (match) {
@@ -381,6 +415,9 @@ export function authenticateDemoUser(identifier: string, secret: string): Protot
     if (trimmed === 'super@etoos247.kr' && secret === 'super1234') {
       return { role: 'super_admin', id: 'admin-2', name: '최고관리자' };
     }
+    if (trimmed === 'teacher@etoos247.kr' && secret === 'teacher1234') {
+      return { role: 'teacher', id: 'teacher-1', name: '담임교사', cohortId: '2027-final-6' };
+    }
     return null;
   }
 
@@ -389,11 +426,25 @@ export function authenticateDemoUser(identifier: string, secret: string): Protot
 }
 
 export async function authenticateUserWithSupabase(identifier: string, secret: string): Promise<PrototypeSession | null> {
+  const trimmed = identifier.trim();
+
+  // Test shortcuts (1234 / 1234)
+  if (secret === '1234') {
+    if (trimmed === 'admin' || trimmed === '1234') {
+      return { role: 'admin', id: 'admin-1', name: '관리자' };
+    }
+    if (trimmed === 'teacher') {
+      return { role: 'teacher', id: 'teacher-1', name: '담임교사', cohortId: '2027-final-6' };
+    }
+    if (trimmed === 'student') {
+      return { role: 'student', id: 'stu-1', name: '김민준' };
+    }
+  }
+
   if (!isSupabaseConfigured) {
     return authenticateDemoUser(identifier, secret);
   }
 
-  const trimmed = identifier.trim();
   if (trimmed.includes('@')) {
     // Admin login
     const { data: admin, error } = await supabase
@@ -416,7 +467,12 @@ export async function authenticateUserWithSupabase(identifier: string, secret: s
         : admin.password === secret; // fallback for unmigrated seed plain text passwords
 
       if (match) {
-        return { role: admin.role as PrototypeRole, id: admin.id, name: admin.name };
+        return { 
+          role: admin.role as PrototypeRole, 
+          id: admin.id, 
+          name: admin.name,
+          cohortId: admin.cohort_id || undefined
+        };
       }
     }
     return null;
@@ -442,7 +498,7 @@ export async function authenticateUserWithSupabase(identifier: string, secret: s
 
 export function canAccessPrototypeArea(role: PrototypeRole, area: PrototypeArea): boolean {
   if (area === 'student') return role === 'student';
-  return role === 'admin' || role === 'super_admin';
+  return role === 'admin' || role === 'super_admin' || role === 'teacher';
 }
 
 export function canStudentModifySchedule(state: PrototypeState, now = new Date(), studentId?: string): boolean {
@@ -567,7 +623,7 @@ export function submitChangeRequest(
   courseId: string,
   now = new Date(),
 ): { ok: true; state: PrototypeState; requestId: string } | { ok: false; reason: string; state: PrototypeState } {
-  if (!getCourseSubmission(state, studentId) && !getConfirmedClassPick(state, studentId)) {
+  if (!getCourseSubmission(state, studentId) && !getConfirmedClassPick(state, studentId) && canStudentModifySchedule(state, now, studentId)) {
     return { ok: false, reason: '수강신청하기 이후 변경 신청을 할 수 있습니다.', state };
   }
 

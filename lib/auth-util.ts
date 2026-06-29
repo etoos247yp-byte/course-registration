@@ -7,7 +7,7 @@ export const SESSION_COOKIE_NAME = 'session';
 
 export type SessionPayload = {
   userId: string;
-  role: 'student' | 'admin' | 'super_admin';
+  role: 'student' | 'admin' | 'super_admin' | 'teacher';
   name: string;
 };
 

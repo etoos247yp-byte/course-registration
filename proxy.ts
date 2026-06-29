@@ -7,7 +7,7 @@ const SESSION_COOKIE_NAME = 'session';
 
 type SessionPayload = {
   userId: string;
-  role: 'student' | 'admin' | 'super_admin';
+  role: 'student' | 'admin' | 'super_admin' | 'teacher';
   name: string;
 };
 
@@ -45,7 +45,7 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    if (sessionPayload.role !== 'admin' && sessionPayload.role !== 'super_admin') {
+    if (sessionPayload.role !== 'admin' && sessionPayload.role !== 'super_admin' && sessionPayload.role !== 'teacher') {
       // Forbidden: Students cannot access admin routes
       // Redirect to student dashboard
       return NextResponse.redirect(new URL('/dashboard', request.url));
@@ -74,7 +74,7 @@ export async function proxy(request: NextRequest) {
   // 4. Gate Login Route (Redirect logged-in users away from /login)
   if (pathname === '/login') {
     if (sessionPayload) {
-      if (sessionPayload.role === 'admin' || sessionPayload.role === 'super_admin') {
+      if (sessionPayload.role === 'admin' || sessionPayload.role === 'super_admin' || sessionPayload.role === 'teacher') {
         return NextResponse.redirect(new URL('/admin', request.url));
       } else {
         return NextResponse.redirect(new URL('/dashboard', request.url));

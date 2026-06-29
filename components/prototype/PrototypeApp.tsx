@@ -28,7 +28,7 @@ import { Bar, BarChart, XAxis, YAxis, Cell, PolarAngleAxis, PolarGrid, Radar, Ra
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { calculateAutoCloseDate } from '@/lib/utils/date-shorthand';
-import { exportStudents, exportCourses, exportRegistrations, parseExcelFile, downloadStudentTemplate, downloadCourseTemplate } from '@/lib/utils/excel';
+import { exportStudents, exportCourses, exportRegistrations, parseExcelFile, downloadStudentTemplate, downloadCourseTemplate, exportAttendanceSheet } from '@/lib/utils/excel';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import {
   adminAddStudentClassAction,
@@ -465,8 +465,9 @@ function PrototypeAppInternal({ view }: { view: View }) {
     }
   }
 
+  const activeView = session?.role === 'teacher' ? 'admin-students' : view;
   const activeStudentId = session?.role === 'student' ? session.id : 'stu-1';
-  const isAdminView = view.startsWith('admin');
+  const isAdminView = activeView.startsWith('admin');
   const canModifySchedule = canStudentModifySchedule(state, getVerifiedNow(), activeStudentId);
   const isStudentSubmitted = Boolean(session?.role === 'student' && getCourseSubmission(state, activeStudentId));
   const isStudentConfirmed = Boolean(session?.role === 'student' && getConfirmedClassPick(state, activeStudentId));
@@ -523,7 +524,7 @@ function PrototypeAppInternal({ view }: { view: View }) {
   }
 
   async function cancelCourse(courseId: string) {
-    if (hasLockedCourseSelection) {
+    if (hasLockedCourseSelection || !canModifySchedule) {
       const result = submitChangeRequest(state, activeStudentId, 'drop', courseId, getVerifiedNow());
       if (result.ok) {
         if (!isSupabaseConfigured) {
@@ -550,11 +551,6 @@ function PrototypeAppInternal({ view }: { view: View }) {
       } else {
         setMessage(result.reason);
       }
-      return;
-    }
-
-    if (!canModifySchedule) {
-      setMessage('수강정정기간이 아니어서 취소할 수 없습니다.');
       return;
     }
 
@@ -680,7 +676,7 @@ function PrototypeAppInternal({ view }: { view: View }) {
           </div>
         </div>
       </Modal>
-      {(view === 'dashboard' || view === 'schedule') && (
+      {(activeView === 'dashboard' || activeView === 'schedule') && (
         <StudentDashboard
           state={state}
           studentId={activeStudentId}
@@ -689,7 +685,7 @@ function PrototypeAppInternal({ view }: { view: View }) {
           onCancel={cancelCourse}
         />
       )}
-      {(view === 'catalog' || view === 'cart') && (
+      {(activeView === 'catalog' || activeView === 'cart') && (
         <Catalog
           state={state}
           studentId={activeStudentId}
@@ -744,7 +740,7 @@ function PrototypeAppInternal({ view }: { view: View }) {
             }
           }}
           onAdd={async (courseId) => {
-            if (hasLockedCourseSelection) {
+            if (hasLockedCourseSelection || !canModifySchedule) {
               const requestResult = submitChangeRequest(state, activeStudentId, 'add', courseId, getVerifiedNow());
               if (requestResult.ok) {
                 if (!isSupabaseConfigured) {
@@ -806,10 +802,11 @@ function PrototypeAppInternal({ view }: { view: View }) {
           }}
         />
       )}
-      {view.startsWith('admin') && (
+      {activeView.startsWith('admin') && (
         <AdminConsole
-          view={view}
+          view={activeView}
           state={state}
+          session={session}
           darkMode={isAdminDarkMode}
           onToggleLock={async () => {
             const nextLocked = !state.locked;
@@ -1246,7 +1243,9 @@ function PrototypeAppInternal({ view }: { view: View }) {
               const level = (r.추천대상 || r.수준 || r.대상 || r.level || r.target || '전체').trim();
               const credits = parseInt(r.학점 || r.시수 || r.credits || r.hours || '2') || 2;
               const capacity = parseInt(r.정원 || r.인원 || r.capacity || r.max_students || '30') || 30;
-              const summary = (r.교재 || r.요약 || r.설명 || r.summary || r.description || '').trim();
+              const textbook = (r.교재 || r.textbook || r.교재명 || '자체 교재').trim();
+              const classroom = (r.강의실 || r.classroom || r.location || '').trim();
+              const summary = (r.요약 || r.설명 || r.summary || r.description || '').trim();
 
               // Extract season
               const seasonCol = (r.시즌 || r.시즌ID || r.season || r.seasonId || '').trim();
@@ -1321,6 +1320,8 @@ function PrototypeAppInternal({ view }: { view: View }) {
                 course.meetings = meetings;
                 course.summary = summary;
                 course.seasonId = seasonId;
+                course.textbook = textbook;
+                course.classroom = classroom;
               } else {
                 course = {
                   id: courseId,
@@ -1335,6 +1336,8 @@ function PrototypeAppInternal({ view }: { view: View }) {
                   enrolled: 0,
                   meetings,
                   summary,
+                  classroom,
+                  textbook,
                 };
                 existingCourses.push(course);
                 newCourses.push(course);
@@ -1584,7 +1587,7 @@ function StudentDashboard({
       </div>
       <div className="mt-8 grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
         <Panel title="내 신청 강좌">
-          <CompactCourseSummary courses={courses} />
+          <CompactCourseSummary state={state} studentId={student.id} courses={courses} />
           {pendingRequests.length > 0 ? (
             <div className="mt-4 rounded-md bg-brand-light px-3 py-2 text-xs leading-relaxed text-brand-dark">
               승인 대기 중인 강의 변경 신청이 {pendingRequests.length}건 있습니다.
@@ -1599,23 +1602,32 @@ function StudentDashboard({
   );
 }
 
-function CompactCourseSummary({ courses }: { courses: PrototypeCourse[] }) {
+function CompactCourseSummary({ state, studentId, courses }: { state: PrototypeState; studentId: string; courses: PrototypeCourse[] }) {
   if (courses.length === 0) {
     return <p className="text-sm text-brand-text-muted">아직 신청한 강좌가 없습니다.</p>;
   }
 
   return (
     <div className="space-y-2">
-      {courses.map((course) => (
-        <div key={course.id} className="rounded-md border border-brand-border px-3 py-2">
-          <div className="flex min-w-0 items-center justify-between gap-3">
-            <p className="min-w-0 truncate text-sm font-semibold">{course.title}</p>
-            <span className="shrink-0 rounded-full bg-brand-bg px-2 py-0.5 text-[11px] font-medium text-brand-dark">
-              {course.subject}
-            </span>
+      {courses.map((course) => {
+        const reg = state.registrations.find((r) => r.studentId === studentId && r.courseId === course.id && r.status === 'active');
+        const regDateStr = reg ? new Date(reg.createdAt).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+        return (
+          <div key={course.id} className="rounded-md border border-brand-border px-3 py-2">
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <div>
+                <p className="min-w-0 truncate text-sm font-semibold">{course.title}</p>
+                {regDateStr && (
+                  <p className="mt-0.5 text-[10px] text-brand-text-faint">신청일시: {regDateStr}</p>
+                )}
+              </div>
+              <span className="shrink-0 rounded-full bg-brand-bg px-2 py-0.5 text-[11px] font-medium text-brand-dark">
+                {course.subject}
+              </span>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -1688,9 +1700,9 @@ function Catalog({
               ))}
             </div>
           </div>
-          {!canModify && !isConfirmed ? (
+          {!canModify ? (
             <div className="mb-5 rounded-md border border-brand-warning-bg bg-brand-warning-light px-4 py-3 text-sm text-brand-warning">
-              수강정정기간이 아니어서 강좌를 담거나 변경할 수 없습니다.
+              수강정정기간이 종료되었습니다. 강좌 추가/취소 신청 시 관리자 승인이 필요합니다.
             </div>
           ) : null}
           <div className="grid gap-4 md:grid-cols-2">
@@ -1714,8 +1726,8 @@ function Catalog({
                 <CourseCard
                   key={course.id}
                   course={course}
-                  actionLabel={hasPendingDrop ? '승인 대기' : enrolled ? '수강 중' : hasPendingAdd ? '승인 대기' : hasLockedCourseSelection ? '수강신청' : canModify ? '담기' : '정정기간 아님'}
-                  disabled={hasPendingDrop || enrolled || (!enrolled && (hasPendingAdd || (!canModify && !hasLockedCourseSelection)))}
+                  actionLabel={hasPendingDrop ? '승인 대기' : enrolled ? '수강 중' : hasPendingAdd ? '승인 대기' : !canModify ? '변경 신청' : hasLockedCourseSelection ? '수강신청' : '담기'}
+                  disabled={hasPendingDrop || enrolled || hasPendingAdd}
                   status={hasPendingDrop ? 'pending' : enrolled ? 'active' : hasPendingAdd ? 'pending' : 'default'}
                   onAction={() => {
                     if (enrolled) return;
@@ -1810,7 +1822,7 @@ function ScheduleTable({ state, studentId }: { state: PrototypeState; studentId:
                               <div key={`${course.id}-${day}-${classBlock}`} className="rounded-md border border-brand bg-brand-light px-2.5 py-2 text-left">
                                 <p className="font-semibold text-brand-dark">{course.title}</p>
                                 <p className="mt-1 text-xs text-brand-text-muted">
-                                  {course.instructor} · {blockLabels[classBlock]}
+                                  {course.instructor} · {blockLabels[classBlock]}{course.classroom ? ` · ${course.classroom}` : ''}
                                 </p>
                               </div>
                             ))}
@@ -1913,13 +1925,13 @@ function RegistrationSummary({
                 <p className="mt-1 text-xs text-brand-text-muted">{course.meetings.map((meeting) => `${meeting.day} ${blockLabels[meeting.block]}`).join(', ')}</p>
                 <button
                   onClick={() => {
-                    if (hasCourseSubmission) {
+                    if (hasCourseSubmission || !canModify) {
                       setCancelCourse(course);
                     } else {
                       onDrop(course.id);
                     }
                   }}
-                  disabled={hasPendingDrop || (!canModify && !hasCourseSubmission)}
+                  disabled={hasPendingDrop}
                   className="mt-3 w-full rounded-md border border-brand-border px-3 py-2 text-xs hover:bg-brand-bg disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {hasPendingDrop ? '승인 대기' : '수강취소'}
@@ -2222,6 +2234,7 @@ function Cart({
 function AdminConsole({
   view,
   state,
+  session,
   darkMode = false,
   onToggleLock,
   onSetCorrectionOpen,
@@ -2240,6 +2253,7 @@ function AdminConsole({
 }: {
   view: View;
   state: PrototypeState;
+  session: PrototypeSession | null;
   darkMode?: boolean;
   onToggleLock: () => void;
   onSetCorrectionOpen: (open: boolean) => void;
@@ -2292,14 +2306,21 @@ function AdminConsole({
 
   return (
     <Page title="관리자 콘솔" description="수강신청 운영을 위한 통합 제어판입니다." darkMode={darkMode}>
-      <div className={`mb-5 p-1 rounded-lg flex items-center gap-1 border w-fit ${
-        darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-100/80 border-zinc-200/60'
-      }`}>
-        <AdminTab href="/admin" label="요약" active={view === 'admin'} darkMode={darkMode} />
-        <AdminTab href="/admin/students" label="학생" active={view === 'admin-students'} darkMode={darkMode} />
-        <AdminTab href="/admin/courses" label="강좌" active={view === 'admin-courses'} darkMode={darkMode} />
-        <AdminTab href="/admin/registrations" label="신청" active={view === 'admin-registrations'} darkMode={darkMode} />
-      </div>
+      {session?.role !== 'teacher' ? (
+        <div className={`mb-5 p-1 rounded-lg flex items-center gap-1 border w-fit ${
+          darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-100/80 border-zinc-200/60'
+        }`}>
+          <AdminTab href="/admin" label="요약" active={view === 'admin'} darkMode={darkMode} />
+          <AdminTab href="/admin/students" label="학생" active={view === 'admin-students'} darkMode={darkMode} />
+          <AdminTab href="/admin/courses" label="강좌" active={view === 'admin-courses'} darkMode={darkMode} />
+          <AdminTab href="/admin/registrations" label="신청" active={view === 'admin-registrations'} darkMode={darkMode} />
+        </div>
+      ) : (
+        <div className="mb-5 flex items-center justify-between border-b pb-3">
+          <h2 className="text-xl font-bold text-brand-dark">담임 교사 제어판</h2>
+          <span className="text-sm font-semibold text-brand-text-muted">담당 반: {session.cohortId}</span>
+        </div>
+      )}
 
       {view === 'admin' ? (
         <>
@@ -2557,6 +2578,7 @@ function AdminConsole({
       {view === 'admin-students' ? (
         <AdminStudents
           state={state}
+          session={session}
           darkMode={darkMode}
           onAdminAddClass={onAdminAddClass}
           onAdminDropClass={onAdminDropClass}
@@ -2792,6 +2814,7 @@ function CorrectionPeriodModal({
 
 function AdminStudents({
   state,
+  session,
   darkMode = false,
   onAdminAddClass,
   onAdminDropClass,
@@ -2801,6 +2824,7 @@ function AdminStudents({
   onAdminDeleteStudents,
 }: {
   state: PrototypeState;
+  session: PrototypeSession | null;
   darkMode?: boolean;
   onAdminAddClass: (studentId: string, courseId: string) => void;
   onAdminDropClass: (studentId: string, courseId: string) => void;
@@ -2813,9 +2837,13 @@ function AdminStudents({
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [showAddModal, setShowAddModal] = React.useState(false);
   const [openingStudent, setOpeningStudent] = React.useState<PrototypeStudent | null>(null);
+  const [timetableStudent, setTimetableStudent] = React.useState<PrototypeStudent | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
+  const isTeacher = session?.role === 'teacher';
+
   const filtered = state.students.filter((s) => {
+    if (isTeacher && s.cohortId !== session?.cohortId) return false;
     const q = query.toLowerCase();
     return `${s.name} ${s.cohortId} ${s.school} ${s.level}`.toLowerCase().includes(q);
   });
@@ -2842,7 +2870,7 @@ function AdminStudents({
               : 'bg-white border-brand-border text-brand-text placeholder-brand-text-faint'
           }`}
         />
-        {selectedIds.size > 0 ? (
+        {!isTeacher && selectedIds.size > 0 ? (
           <button
             onClick={() => {
               if (confirm(`선택한 ${selectedIds.size}명의 학생을 정말 삭제하시겠습니까?\n해당 학생들의 모든 수강 신청 내역도 함께 삭제됩니다.`)) {
@@ -2855,14 +2883,16 @@ function AdminStudents({
             선택 삭제 ({selectedIds.size})
           </button>
         ) : null}
+        {!isTeacher && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="rounded-md bg-brand hover:bg-brand-dark text-white px-3 py-2 text-xs font-semibold transition-colors"
+          >
+            학생 등록
+          </button>
+        )}
         <button
-          onClick={() => setShowAddModal(true)}
-          className="rounded-md bg-brand hover:bg-brand-dark text-white px-3 py-2 text-xs font-semibold transition-colors"
-        >
-          학생 등록
-        </button>
-        <button
-          onClick={() => exportStudents(state.students)}
+          onClick={() => exportStudents(filtered)}
           className={`rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
             darkMode
               ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-850 bg-zinc-800 hover:text-white'
@@ -2871,24 +2901,28 @@ function AdminStudents({
         >
           Excel 내보내기
         </button>
-        <button
-          onClick={downloadStudentTemplate}
-          className={`rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
-            darkMode
-              ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-850 bg-zinc-800 hover:text-white'
-              : 'border-brand-border text-brand-text hover:bg-brand-bg'
-          }`}
-        >
-          양식 다운로드
-        </button>
-        <label htmlFor="student-excel-upload" className={`cursor-pointer rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
-          darkMode
-            ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-850 bg-zinc-800 hover:text-white'
-            : 'border-brand-border text-brand-text hover:bg-brand-bg'
-        }`}>
-          Excel 가져오기
-          <input id="student-excel-upload" ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" />
-        </label>
+        {!isTeacher && (
+          <>
+            <button
+              onClick={downloadStudentTemplate}
+              className={`rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
+                darkMode
+                  ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-850 bg-zinc-800 hover:text-white'
+                  : 'border-brand-border text-brand-text hover:bg-brand-bg'
+              }`}
+            >
+              양식 다운로드
+            </button>
+            <label htmlFor="student-excel-upload" className={`cursor-pointer rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
+              darkMode
+                ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-850 bg-zinc-800 hover:text-white'
+                : 'border-brand-border text-brand-text hover:bg-brand-bg'
+            }`}>
+              Excel 가져오기
+              <input id="student-excel-upload" ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" />
+            </label>
+          </>
+        )}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1000px] border-collapse border border-zinc-300 dark:border-zinc-700 text-sm">
@@ -2970,67 +3004,87 @@ function AdminStudents({
                             darkMode ? 'border-zinc-700 bg-zinc-800/40 text-zinc-300' : 'border-brand-border bg-white text-brand-text'
                           }`}>
                             <span className="text-[11px] leading-tight">{course.title}</span>
-                            <button
-                              onClick={() => onAdminDropClass(student.id, course.id)}
-                              className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold transition-colors shrink-0 ${
-                                darkMode ? 'border-zinc-650 text-zinc-450 hover:bg-zinc-700 hover:text-white' : 'border-gray-200 bg-gray-50 text-zinc-500 hover:bg-gray-150 hover:text-zinc-700'
-                              }`}
-                            >
-                              제외
-                            </button>
+                            {!isTeacher && (
+                              <button
+                                onClick={() => onAdminDropClass(student.id, course.id)}
+                                className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold transition-colors shrink-0 ${
+                                  darkMode ? 'border-zinc-650 text-zinc-450 hover:bg-zinc-700 hover:text-white' : 'border-gray-200 bg-gray-50 text-zinc-500 hover:bg-gray-150 hover:text-zinc-700'
+                                }`}
+                              >
+                                제외
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>
                     </td>
                     <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800' : 'border-zinc-250'}`}>
-                      <select
-                        defaultValue=""
-                        onChange={(event) => {
-                          if (!event.target.value) return;
-                          onAdminAddClass(student.id, event.target.value);
-                          event.target.value = '';
-                        }}
-                        className={`w-full max-w-[150px] rounded border px-2 py-1 text-xs outline-none transition-colors ${
-                          darkMode
-                            ? 'bg-zinc-850 border-zinc-700 text-zinc-300 focus:border-brand'
-                            : 'bg-white border-zinc-300 text-brand-text'
-                        }`}
-                      >
-                        <option value="">강좌 추가</option>
-                        {availableCourses.map((course) => (
-                          <option key={course.id} value={course.id} className={darkMode ? 'bg-zinc-900 text-zinc-100' : ''}>
-                            {course.title}
-                          </option>
-                        ))}
-                      </select>
+                      {!isTeacher ? (
+                        <select
+                          defaultValue=""
+                          onChange={(event) => {
+                            if (!event.target.value) return;
+                            onAdminAddClass(student.id, event.target.value);
+                            event.target.value = '';
+                          }}
+                          className={`w-full max-w-[150px] rounded border px-2 py-1 text-xs outline-none transition-colors ${
+                            darkMode
+                              ? 'bg-zinc-850 border-zinc-700 text-zinc-300 focus:border-brand'
+                              : 'bg-white border-zinc-300 text-brand-text'
+                          }`}
+                        >
+                          <option value="">강좌 추가</option>
+                          {availableCourses.map((course) => (
+                            <option key={course.id} value={course.id} className={darkMode ? 'bg-zinc-900 text-zinc-100' : ''}>
+                              {course.title}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className={`text-[11px] ${darkMode ? 'text-zinc-550' : 'text-zinc-450'}`}>-</span>
+                      )}
                     </td>
                     <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800' : 'border-zinc-250'}`}>
                       <div className="flex items-center gap-1.5">
                         <button
-                          onClick={() => setOpeningStudent(student)}
+                          onClick={() => setTimetableStudent(student)}
                           className={`rounded border px-2 py-1 text-[10px] font-semibold transition-colors shrink-0 ${
                             darkMode
-                              ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-850 hover:text-white'
+                              ? 'border-zinc-700 text-zinc-350 hover:bg-zinc-800 hover:text-white bg-zinc-850'
                               : 'border-zinc-300 text-brand-text bg-white hover:bg-brand-bg'
                           }`}
                         >
-                          정정기간 열기
+                          시간표
                         </button>
-                        {opening ? (
-                          <div className="text-[10px] font-semibold text-brand mt-1 leading-tight shrink-0">
-                            정정기간: {opening.open.substring(5, 16).replace('T', ' ')} ~ {opening.close.substring(5, 16).replace('T', ' ')}
-                          </div>
-                        ) : null}
-                        <button
-                          onClick={() => {
-                            if (confirm(`학생 '${student.name}'을(를) 정말 삭제하시겠습니까?\n해당 학생의 모든 수강 신청 기록도 함께 삭제됩니다.`)) {
-                              onAdminDeleteStudents([student.id]);
-                            }
-                          }}
-                          className="text-red-500 hover:text-red-700 text-[10px] font-semibold shrink-0 ml-1.5 transition-colors"
-                        >
-                          삭제
-                        </button>
+                        {!isTeacher && (
+                          <>
+                            <button
+                              onClick={() => setOpeningStudent(student)}
+                              className={`rounded border px-2 py-1 text-[10px] font-semibold transition-colors shrink-0 ${
+                                darkMode
+                                  ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-850 hover:text-white bg-zinc-800'
+                                  : 'border-zinc-300 text-brand-text bg-white hover:bg-brand-bg'
+                              }`}
+                            >
+                              정정기간 열기
+                            </button>
+                            {opening ? (
+                              <div className="text-[10px] font-semibold text-brand mt-1 leading-tight shrink-0">
+                                정정기간: {opening.open.substring(5, 16).replace('T', ' ')} ~ {opening.close.substring(5, 16).replace('T', ' ')}
+                              </div>
+                            ) : null}
+                            <button
+                              onClick={() => {
+                                if (confirm(`학생 '${student.name}'을(를) 정말 삭제하시겠습니까?\n해당 학생의 모든 수강 신청 기록도 함께 삭제됩니다.`)) {
+                                  onAdminDeleteStudents([student.id]);
+                                }
+                              }}
+                              className="text-red-500 hover:text-red-700 text-[10px] font-semibold shrink-0 ml-1.5 transition-colors"
+                            >
+                              삭제
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -3062,6 +3116,26 @@ function AdminStudents({
             setOpeningStudent(null);
           }}
         />
+      )}
+      {timetableStudent && (
+        <Modal
+          open={Boolean(timetableStudent)}
+          onClose={() => setTimetableStudent(null)}
+          title={
+            <span className="text-lg font-semibold text-gray-900">
+              {timetableStudent.name} 학생 시간표 ({timetableStudent.cohortId})
+            </span>
+          }
+          footer={
+            <Button variant="secondary" onClick={() => setTimetableStudent(null)}>
+              닫기
+            </Button>
+          }
+        >
+          <div className="py-2 overflow-x-auto">
+            <ScheduleTable state={state} studentId={timetableStudent.id} />
+          </div>
+        </Modal>
       )}
     </Panel>
   );
@@ -3181,10 +3255,10 @@ function AdminCourses({
                 <th className={`border border-zinc-300 dark:border-zinc-700 text-center font-mono text-[10px] w-8 select-none text-zinc-400 dark:text-zinc-500 ${darkMode ? 'border-zinc-700 bg-zinc-800/30' : 'bg-zinc-50'}`}>
                   A
                 </th>
-                {['코드 (B)', '과목 (C)', '강좌명 (D)', '강사 (E)', '시수 (F)', '정원 (G)', '시즌 (H)'].map((header) => (
+                {['코드 (B)', '과목 (C)', '강좌명 (D)', '강사 (E)', '교재 (F)', '시간 (G)', '정원 (H)', '시즌 (I)'].map((header) => (
                   <th
                     key={header}
-                    className={`border border-zinc-300 dark:border-zinc-700 px-2 py-1.5 text-left font-semibold text-xs ${
+                    className={`border border-zinc-300 dark:border-zinc-750 px-2 py-1.5 text-left font-semibold text-xs ${
                       darkMode ? 'border-zinc-700 text-zinc-300' : 'border-zinc-300 text-zinc-700'
                     }`}
                   >
@@ -3216,7 +3290,10 @@ function AdminCourses({
                       <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800 text-zinc-400' : 'border-zinc-250 text-brand-text-muted'}`}>{course.subject}</td>
                       <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs font-semibold ${darkMode ? 'border-zinc-800 text-zinc-200' : 'border-zinc-250 text-brand-text'}`}>{course.title}</td>
                       <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800 text-zinc-300' : 'border-zinc-250 text-brand-text-muted'}`}>{course.instructor}</td>
-                      <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs font-mono text-center ${darkMode ? 'border-zinc-800 text-zinc-350' : 'border-zinc-250 text-brand-text-muted'}`}>{course.credits}시수</td>
+                      <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800 text-zinc-300' : 'border-zinc-250 text-brand-text-muted'}`}>{course.textbook || '자체 교재'}</td>
+                      <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800 text-zinc-350' : 'border-zinc-250 text-brand-text-muted'}`}>
+                        {course.meetings.map((meeting) => `${meeting.day} ${blockLabels[meeting.block] || meeting.block}`).join(', ')}
+                      </td>
                       <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800 text-zinc-200' : 'border-zinc-250 text-brand-text'}`}>
                         <span className="font-semibold">{course.enrolled}/{course.capacity}</span>
                         <span className={`ml-1 text-[10px] ${darkMode ? 'text-zinc-500' : 'text-brand-text-faint'}`}>({pct}%)</span>
@@ -3229,43 +3306,80 @@ function AdminCourses({
                       <tr className={darkMode ? 'bg-zinc-950/10' : 'bg-zinc-50/20'}>
                         <td className={`border border-zinc-250 dark:border-zinc-750 ${darkMode ? 'border-zinc-800 bg-zinc-900/30' : 'border-zinc-250 bg-zinc-50/50'}`} />
                         <td className={`border border-zinc-250 dark:border-zinc-750 text-center font-mono text-[10px] select-none ${darkMode ? 'border-zinc-800 bg-zinc-900/30' : 'border-zinc-250 bg-zinc-50/50'}`} />
-                        <td colSpan={7} className={`border border-zinc-250 dark:border-zinc-750 px-6 py-4 text-left ${darkMode ? 'border-zinc-800 bg-zinc-900/10' : 'border-zinc-250 bg-white'}`}>
-                          <p className={`mb-3 text-xs font-semibold ${darkMode ? 'text-zinc-300' : 'text-brand-text-muted'}`}>
-                            수강 학생 분반 현황 (총 {enrolled.length}명)
-                          </p>
+                        <td colSpan={8} className={`border border-zinc-250 dark:border-zinc-750 px-6 py-4 text-left ${darkMode ? 'border-zinc-800 bg-zinc-900/10' : 'border-zinc-250 bg-white'}`}>
+                          <div className="flex items-center justify-between mb-3">
+                            <p className={`text-xs font-semibold ${darkMode ? 'text-zinc-300' : 'text-brand-text-muted'}`}>
+                              수강 학생 분반 현황 (총 {enrolled.length}명)
+                            </p>
+                            {enrolled.length > 0 && (
+                              <button
+                                onClick={() => {
+                                  exportAttendanceSheet(
+                                    {
+                                      title: course.title,
+                                      subject: course.subject,
+                                      instructor: course.instructor,
+                                      textbook: '자체 교재',
+                                    },
+                                    enrolled.map((s) => ({
+                                      cohortId: s.cohortId,
+                                      name: s.name,
+                                      school: s.school,
+                                      level: s.level,
+                                      dob: s.dob || '',
+                                    }))
+                                  );
+                                }}
+                                className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                                  darkMode
+                                    ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-800 bg-zinc-850 hover:text-white'
+                                    : 'border-brand-border text-brand-text hover:bg-brand-bg bg-white'
+                                }`}
+                              >
+                                출석부 다운로드
+                              </button>
+                            )}
+                          </div>
                           {enrolled.length === 0 ? (
                             <p className={`text-xs ${darkMode ? 'text-zinc-500' : 'text-brand-text-muted'}`}>수강 학생 없음</p>
                           ) : (() => {
-                            const grouped: Record<string, PrototypeStudent[]> = {};
-                            for (const s of enrolled) {
-                              const cls = (s.cohortId || '기타').trim();
-                              if (!grouped[cls]) grouped[cls] = [];
-                              grouped[cls].push(s);
-                            }
-                            return (
-                              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                                {Object.entries(grouped).map(([cls, students]) => (
-                                  <div key={cls} className={`border rounded overflow-hidden flex flex-col ${
-                                    darkMode ? 'border-zinc-800 bg-zinc-900/50' : 'border-zinc-200 bg-zinc-50/50'
-                                  }`}>
-                                    <div className={`px-2 py-1 text-[11px] font-bold text-center border-b font-mono ${
-                                      darkMode ? 'border-zinc-800 bg-zinc-800/80 text-zinc-300' : 'border-zinc-200 bg-zinc-150 text-zinc-700'
-                                    }`}>
-                                      {cls} ({students.length}명)
-                                    </div>
-                                    <div className="p-1.5 space-y-1 flex-1">
-                                      {students.map((s) => (
-                                        <div key={s.id} className={`px-2 py-1 text-[11px] rounded border text-center font-medium ${
-                                          darkMode ? 'bg-zinc-850 border-zinc-750 text-zinc-350' : 'bg-white border-zinc-150 text-brand-text'
-                                        }`}>
-                                          {s.name}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            );
+                             const grouped: Record<string, PrototypeStudent[]> = {};
+                             for (const s of enrolled) {
+                               const cls = (s.cohortId || '기타').trim();
+                               if (!grouped[cls]) grouped[cls] = [];
+                               grouped[cls].push(s);
+                             }
+                             return (
+                               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                                 {Object.entries(grouped).map(([cls, students]) => (
+                                   <div key={cls} className={`border rounded overflow-hidden flex flex-col ${
+                                     darkMode ? 'border-zinc-800 bg-zinc-900/50' : 'border-zinc-200 bg-zinc-50/50'
+                                   }`}>
+                                     <div className={`px-2 py-1 text-[11px] font-bold text-center border-b font-mono ${
+                                       darkMode ? 'border-zinc-800 bg-zinc-800/80 text-zinc-300' : 'border-zinc-200 bg-zinc-150 text-zinc-700'
+                                     }`}>
+                                       {cls} ({students.length}명)
+                                     </div>
+                                     <div className="p-1.5 space-y-1 flex-1">
+                                       {students.map((s) => {
+                                         const reg = state.registrations.find((r) => r.studentId === s.id && r.courseId === course.id && r.status === 'active');
+                                         const regTime = reg ? (() => {
+                                           const d = new Date(reg.createdAt);
+                                           return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                                         })() : '';
+                                         return (
+                                           <div key={s.id} title={regTime ? `신청일시: ${regTime}` : undefined} className={`px-2 py-1 text-[11px] rounded border text-center font-medium ${
+                                             darkMode ? 'bg-zinc-850 border-zinc-750 text-zinc-350' : 'bg-white border-zinc-150 text-brand-text'
+                                           }`}>
+                                             {s.name} {regTime ? `(${regTime})` : ''}
+                                           </div>
+                                         );
+                                       })}
+                                     </div>
+                                   </div>
+                                 ))}
+                               </div>
+                             );
                           })()}
                         </td>
                       </tr>
@@ -3303,7 +3417,6 @@ function AdminRegistrations({
     const q = query.toLowerCase();
     return `${s.name} ${s.cohortId} ${s.school}`.toLowerCase().includes(q);
   });
-
   const exportRows = filtered.map((student) => {
     const courses = getStudentCourses(state, student.id);
     return {
@@ -3416,13 +3529,20 @@ function AdminRegistrations({
                     <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800 text-zinc-400' : 'border-zinc-250 text-brand-text-muted'}`}>{student.school}</td>
                     <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs ${darkMode ? 'border-zinc-800' : 'border-zinc-250'}`}>
                       <div className="flex flex-wrap gap-1">
-                        {courses.map((c) => (
-                          <span key={c.id} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors ${
-                            darkMode ? 'bg-brand/15 text-brand' : 'bg-brand-light text-brand-dark'
-                          }`}>
-                            {c.title}
-                          </span>
-                        ))}
+                        {courses.map((c) => {
+                          const reg = state.registrations.find((r) => r.studentId === student.id && r.courseId === c.id && r.status === 'active');
+                          const regTime = reg ? (() => {
+                            const d = new Date(reg.createdAt);
+                            return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                          })() : '';
+                          return (
+                            <span key={c.id} title={regTime ? `신청일시: ${regTime}` : undefined} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+                              darkMode ? 'bg-brand/15 text-brand' : 'bg-brand-light text-brand-dark'
+                            }`}>
+                              {c.title} {regTime ? `(${regTime})` : ''}
+                            </span>
+                          );
+                        })}
                       </div>
                     </td>
                     <td className={`border border-zinc-250 dark:border-zinc-750 px-2.5 py-1.5 text-xs font-mono ${darkMode ? 'border-zinc-800' : 'border-zinc-250'}`}>
@@ -4045,6 +4165,7 @@ function CourseCard({
         <Row label="수준" value={course.level} />
         <Row label="정원" value={`${course.enrolled}/${course.capacity}`} />
         <Row label="시간" value={course.meetings.map((meeting) => `${meeting.day} ${blockLabels[meeting.block]}`).join(', ')} />
+        {course.classroom && <Row label="강의실" value={course.classroom} />}
       </div>
       <button
         onClick={onAction}

@@ -1,4 +1,4 @@
-export type Role = 'student' | 'admin' | 'super_admin';
+export type Role = 'student' | 'admin' | 'super_admin' | 'teacher';
 
 export type Subject = '국어' | '수학' | '영어' | '탐구';
 export type SubKor = '독서' | '문학' | '화작' | '언매' | '실모' | '수1' | '수2' | '미적분' | string;
@@ -27,6 +27,7 @@ export type Course = {
   objective: string;
   elective?: string;
   capacity?: number;
+  classroom?: string;
 };
 
 export type Student = {
@@ -89,7 +90,8 @@ export type AdminAccount = {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'super_admin';
+  role: 'admin' | 'super_admin' | 'teacher';
+  cohortId?: string;
   passwordHash: string;
   lastLoginAt?: string;
 };
